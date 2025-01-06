@@ -202,6 +202,64 @@ async def test_browser_use_custom():
         await browser.close()
 
 
-if __name__ == '__main__':
+async def test_browser_persistence():
+    """Test browser persistence functionality"""
+    from playwright.async_api import async_playwright
+    from browser_use.browser.context import BrowserContextWindowSize
+    from src.browser.custom_browser import CustomBrowser, BrowserConfig
+    from src.browser.custom_context import BrowserContext, BrowserContextConfig
+
+    # Set persistence environment variable
+    os.environ["CHROME_PERSISTENT_SESSION"] = "true"
+
+    window_w, window_h = 1920, 1080
+    browser = None
+    try:
+        browser = CustomBrowser(
+            config=BrowserConfig(
+                headless=False,
+                disable_security=True,
+                extra_chromium_args=[f"--window-size={window_w},{window_h}"],
+            )
+        )
+
+        # First context
+        async with await browser.new_context(
+            config=BrowserContextConfig(
+                trace_path="./tmp/test_persistence",
+                no_viewport=False,
+                browser_window_size=BrowserContextWindowSize(
+                    width=window_w, height=window_h
+                ),
+            )
+        ) as context1:
+            page1 = await context1.new_page()
+            await page1.goto("https://example.com")
+
+        # Second context should reuse the same browser
+        async with await browser.new_context(
+            config=BrowserContextConfig(
+                trace_path="./tmp/test_persistence",
+                no_viewport=False,
+                browser_window_size=BrowserContextWindowSize(
+                    width=window_w, height=window_h
+                ),
+            )
+        ) as context2:
+            assert (
+                len(browser._browser.contexts) > 0
+            ), "Browser should have persisted contexts"
+            page2 = await context2.new_page()
+            await page2.goto("https://example.com")
+
+    finally:
+        if browser:
+            await browser.close()
+        # Reset environment
+        os.environ["CHROME_PERSISTENT_SESSION"] = ""
+
+
+if __name__ == "__main__":
     # asyncio.run(test_browser_use_org())
-    asyncio.run(test_browser_use_custom())
+    # asyncio.run(test_browser_use_custom())
+    asyncio.run(test_browser_persistence())

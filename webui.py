@@ -191,6 +191,7 @@ async def run_custom_agent(
                     no_viewport=False,
                     browser_window_size=BrowserContextWindowSize(width=window_w, height=window_h),
                 ),
+
                 context=browser_context_
         ) as browser_context:
             agent = CustomAgent(
@@ -218,13 +219,17 @@ async def run_custom_agent(
         model_thoughts = ""
     finally:
         # 显式关闭持久化上下文
-        if browser_context_:
-            await browser_context_.close()
+        persistence_enabled = (
+            os.getenv("CHROME_PERSISTENT_SESSION", "").lower() == "true"
+        )
+        if not persistence_enabled:
+            if browser_context_:
+                await browser_context_.close()
 
-        # 关闭 Playwright 对象
-        if playwright:
-            await playwright.stop()
-        await browser.close()
+            # 关闭 Playwright 对象
+            if playwright:
+                await playwright.stop()
+            await browser.close()
     return final_result, errors, model_actions, model_thoughts
 
 
