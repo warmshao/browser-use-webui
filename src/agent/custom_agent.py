@@ -245,10 +245,10 @@ class CustomAgent(Agent):
                         if not await self._validate_output():
                             continue
 
-                    logger.info('✅ Task completed successfully')
+                    logger.info('Task completed successfully')
                     break
             else:
-                logger.info('❌ Failed to complete task in maximum steps')
+                logger.info('Task failed to complete within maximum steps')
 
             return self.history
 
