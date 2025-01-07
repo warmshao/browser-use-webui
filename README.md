@@ -14,6 +14,10 @@ This project builds upon the foundation of the [browser-use](https://github.com/
 
 <video src="https://github.com/user-attachments/assets/58c0f59e-02b4-4413-aba8-6184616bf181" controls="controls" width="500" height="300" >Your browser does not support playing this video!</video>
 
+**Changelog**
+- [x] **2025/01/06:** Thanks to @richard-devbot, a New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
+
+
 ## Environment Installation
 
 1.  **Python Version:** Ensure you have Python 3.11 or higher installed.
