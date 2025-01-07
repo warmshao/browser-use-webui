@@ -5,6 +5,25 @@
 # @Project : browser-use-webui
 # @FileName: webui.py
 import pdb
+import logging
+import sys
+import os
+
+# Create logs directory if it doesn't exist
+logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+os.makedirs(logs_dir, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(os.path.join(logs_dir, 'webui.log'), encoding='utf-8', mode='a')
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
@@ -36,6 +55,7 @@ from src.agent.custom_prompts import CustomSystemPrompt
 
 from src.utils import utils
 
+
 async def run_browser_agent(
         agent_type,
         llm_provider,
@@ -54,14 +74,10 @@ async def run_browser_agent(
         max_steps,
         use_vision
 ):
-    # Ensure the recording directory exists
-    os.makedirs(save_recording_path, exist_ok=True)
+    """
+    Runs the browser agent based on user configurations.
+    """
 
-    # Get the list of existing videos before the agent runs
-    existing_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) + 
-                          glob.glob(os.path.join(save_recording_path, '*.[wW][eE][bB][mM]')))
-
-    # Run the agent
     llm = utils.get_llm_model(
         provider=llm_provider,
         model_name=llm_model_name,
@@ -70,7 +86,7 @@ async def run_browser_agent(
         api_key=llm_api_key
     )
     if agent_type == "org":
-        final_result, errors, model_actions, model_thoughts = await run_org_agent(
+        return await run_org_agent(
             llm=llm,
             headless=headless,
             disable_security=disable_security,
@@ -82,7 +98,7 @@ async def run_browser_agent(
             use_vision=use_vision
         )
     elif agent_type == "custom":
-        final_result, errors, model_actions, model_thoughts = await run_custom_agent(
+        return await run_custom_agent(
             llm=llm,
             use_own_browser=use_own_browser,
             headless=headless,
@@ -98,16 +114,6 @@ async def run_browser_agent(
     else:
         raise ValueError(f"Invalid agent type: {agent_type}")
 
-    # Get the list of videos after the agent runs
-    new_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) + 
-                     glob.glob(os.path.join(save_recording_path, '*.[wW][eE][bB][mM]')))
-
-    # Find the newly created video
-    latest_video = None
-    if new_videos - existing_videos:
-        latest_video = list(new_videos - existing_videos)[0]  # Get the first new video
-
-    return final_result, errors, model_actions, model_thoughts, latest_video
 
 async def run_org_agent(
         llm,
@@ -147,8 +153,10 @@ async def run_org_agent(
         errors = history.errors()
         model_actions = history.model_actions()
         model_thoughts = history.model_thoughts()
+
     await browser.close()
     return final_result, errors, model_actions, model_thoughts
+
 
 async def run_custom_agent(
         llm,
@@ -166,11 +174,16 @@ async def run_custom_agent(
     controller = CustomController()
     playwright = None
     browser_context_ = None
+    browser = None
     try:
         if use_own_browser:
             playwright = await async_playwright().start()
             chrome_exe = os.getenv("CHROME_PATH", "")
             chrome_use_data = os.getenv("CHROME_USER_DATA", "")
+
+            if not chrome_exe or not chrome_use_data:
+                raise ValueError("CHROME_PATH and CHROME_USER_DATA environment variables must be set when use_own_browser=True")
+
             browser_context_ = await playwright.chromium.launch_persistent_context(
                 user_data_dir=chrome_use_data,
                 executable_path=chrome_exe,
@@ -229,239 +242,437 @@ async def run_custom_agent(
         model_actions = ""
         model_thoughts = ""
     finally:
-        # 显式关闭持久化上下文
-        if browser_context_:
-            await browser_context_.close()
-
-        # 关闭 Playwright 对象
-        if playwright:
-            await playwright.stop()
-        await browser.close()
+        try:
+            # Clean up in reverse order of creation
+            if browser:
+                await browser.close()
+            if browser_context_:
+                await browser_context_.close()
+            if playwright:
+                await playwright.stop()
+        except Exception as cleanup_error:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error during cleanup: {cleanup_error}")
     return final_result, errors, model_actions, model_thoughts
 
 
-import argparse
-import gradio as gr
-from gradio.themes import Base, Default, Soft, Monochrome, Glass, Origin, Citrus, Ocean
-import os, glob
+def main():
+    parser = argparse.ArgumentParser(description="Gradio UI for Browser Agent")
+    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
+    parser.add_argument("--port", type=int, default=7788, help="Port to listen on")
+    args = parser.parse_args()
 
-# Define the theme map globally
-theme_map = {
-    "Default": Default(),
-    "Soft": Soft(),
-    "Monochrome": Monochrome(),
-    "Glass": Glass(),
-    "Origin": Origin(),
-    "Citrus": Citrus(),
-    "Ocean": Ocean()
-}
-
-def create_ui(theme_name="Ocean"):
     css = """
-    .gradio-container {
-        max-width: 1200px !important;
-        margin: auto !important;
-        padding-top: 20px !important;
+    /* Modern UI Styles */
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --success-color: #059669;
+        --error-color: #dc2626;
+        --background-light: #f8fafc;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --radius-md: 8px;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     }
-    .header-text {
+
+    /* Hide footer */
+    footer {display: none !important;}
+
+    /* Container styles */
+    .container {
+        max-width: 1200px;
+        margin: auto;
+        padding: 2rem;
+    }
+
+    /* Header styles */
+    .header {
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: 2.5rem;
+        padding: 2rem;
+        background: linear-gradient(to right, #2563eb, #1e40af);
+        border-radius: var(--radius-md);
+        color: white;
+        box-shadow: var(--shadow-md);
     }
-    .theme-section {
-        margin-bottom: 20px;
-        padding: 15px;
-        border-radius: 10px;
+    .header h1 {
+        margin-bottom: 1rem;
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    .header p {
+        color: #e2e8f0;
+        font-size: 1.1rem;
+    }
+
+    /* Tab styles */
+    .tabs {
+        margin-top: 1rem;
+    }
+    .tab-nav {
+        background: var(--background-light);
+        border-radius: var(--radius-md);
+        padding: 0.5rem;
+    }
+    .tab-nav button {
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+    }
+    .tab-nav button.selected {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    /* Form elements */
+    .gr-form {
+        border: 1px solid var(--border-color);
+        padding: 1.5rem;
+        border-radius: var(--radius-md);
+        background: white;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 1rem;
+    }
+    .gr-form:hover {
+        box-shadow: var(--shadow-md);
+        transition: box-shadow 0.2s;
+    }
+    .gr-input, .gr-select, .gr-checkbox {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.5rem;
+    }
+    .gr-input:focus, .gr-select:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+    .gr-button {
+        border-radius: var(--radius-md);
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .gr-button:hover {
+        transform: translateY(-1px);
+    }
+
+    /* Section headers */
+    .section-header {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 1.5rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    /* Status indicators */
+    .status-indicator {
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-md);
+        display: inline-block;
+        margin: 0.5rem;
+        font-weight: 500;
+        box-shadow: var(--shadow-sm);
+    }
+    .status-success {
+        background: #ecfdf5;
+        color: var(--success-color);
+        border: 1px solid #a7f3d0;
+    }
+    .status-error {
+        background: #fef2f2;
+        color: var(--error-color);
+        border: 1px solid #fecaca;
+    }
+
+    /* Output panel */
+    .output-panel {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: white;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+    }
+    .output-panel .gr-textarea {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        font-family: monospace;
+        background: var(--background-light);
+    }
+    .copy-button {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+    }
+    .copy-button:hover {
+        background: var(--background-light);
+    }
+
+    /* Tooltips */
+    .gr-form label span.info-icon {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-left: 0.5rem;
     }
     """
 
-    js = """
-    function refresh() {
-        const url = new URL(window.location);
-        if (url.searchParams.get('__theme') !== 'dark') {
-            url.searchParams.set('__theme', 'dark');
-            window.location.href = url.href;
-        }
-    }
-    """
-    
-    with gr.Blocks(title="Browser Use WebUI", theme=theme_map[theme_name], css=css, js=js) as demo:
-        with gr.Row():
-            gr.Markdown(
-                """
-                # 🌐 Browser Use WebUI
-                ### Control your browser with AI assistance
-                """,
-                elem_classes=["header-text"]
-            )
-        
-        with gr.Tabs() as tabs:
-            with gr.TabItem("🤖 Agent Settings", id=1):
-                with gr.Group():
-                    agent_type = gr.Radio(
-                        ["org", "custom"],
-                        label="Agent Type",
-                        value="custom",
-                        info="Select the type of agent to use"
-                    )
-                    max_steps = gr.Slider(
-                        minimum=1,
-                        maximum=200,
-                        value=100,
-                        step=1,
-                        label="Max Run Steps",
-                        info="Maximum number of steps the agent will take"
-                    )
-                    use_vision = gr.Checkbox(
-                        label="Use Vision",
-                        value=True,
-                        info="Enable visual processing capabilities"
-                    )
+    with gr.Blocks(
+        title="Browser Use WebUI",
+        theme=gr.themes.Soft(
+            primary_hue="blue",
+            secondary_hue="indigo",
+            neutral_hue="slate",
+            font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui"]
+        ),
+        css=css
+    ) as demo:
+        gr.Markdown(
+            """
+            <div class="header">
+                <h1>🌐 Browser Use WebUI</h1>
+                <p>A powerful and intuitive tool for browser automation and task execution</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Configure your agent, set up your browser, and automate your tasks with ease</p>
+            </div>
+            """
+        )
 
-            with gr.TabItem("🔧 LLM Configuration", id=2):
-                with gr.Group():
-                    llm_provider = gr.Dropdown(
-                        ["anthropic", "openai", "gemini", "azure_openai", "deepseek", "ollama"],
-                        label="LLM Provider",
-                        value="gemini",
-                        info="Select your preferred language model provider"
-                    )
-                    llm_model_name = gr.Textbox(
-                        label="Model Name",
-                        value="gemini-2.0-flash-exp",
-                        info="Specify the model to use"
-                    )
-                    llm_temperature = gr.Slider(
-                        minimum=0.0,
-                        maximum=2.0,
-                        value=1.0,
-                        step=0.1,
-                        label="Temperature",
-                        info="Controls randomness in model outputs"
-                    )
+        with gr.Tabs(elem_classes="tabs"):
+            with gr.TabItem("🤖 Task Configuration", elem_classes="tab-content"):
+                with gr.Group(elem_classes="gr-form"):
+                    gr.Markdown("### Agent Configuration")
+                    with gr.Row():
+                        agent_type = gr.Radio(
+                            ["org", "custom"],
+                            label="Agent Type",
+                            value="custom",
+                            info="Select the type of agent to use for task execution",
+                            elem_classes="agent-select"
+                        )
+                        max_steps = gr.Slider(
+                            minimum=1,
+                            maximum=200,
+                            value=100,
+                            step=1,
+                            label="Maximum Steps",
+                            info="Maximum number of steps the agent can take to complete the task",
+                            elem_classes="step-slider"
+                        )
+                        use_vision = gr.Checkbox(
+                            label="Enable Vision",
+                            value=True,
+                            info="Allow agent to process and understand visual information from the browser",
+                            elem_classes="vision-toggle"
+                        )
+
+                with gr.Group(elem_classes="gr-form"):
+                    gr.Markdown("### 🧠 Language Model Configuration")
+                    with gr.Row():
+                        llm_provider = gr.Dropdown(
+                            ["anthropic", "openai", "gemini", "azure_openai", "deepseek", "ollama"],
+                            label="LLM Provider",
+                            value="gemini",
+                            info="Choose your preferred Language Model provider",
+                            elem_classes="llm-select"
+                        )
+                        llm_model_name = gr.Textbox(
+                            label="Model Name",
+                            value="gemini-2.0-flash-exp",
+                            info="Specify the model version/name to use",
+                            elem_classes="model-input"
+                        )
+                        llm_temperature = gr.Slider(
+                            minimum=0.0,
+                            maximum=2.0,
+                            value=1.0,
+                            step=0.1,
+                            label="Temperature",
+                            info="Adjust creativity vs determinism (higher = more creative)",
+                            elem_classes="temp-slider"
+                        )
+                    
                     with gr.Row():
                         llm_base_url = gr.Textbox(
-                            label="Base URL",
-                            info="API endpoint URL (if required)"
+                            label="API Base URL",
+                            placeholder="Enter your API endpoint URL (optional)",
+                            info="Custom API endpoint for your LLM provider",
+                            elem_classes="url-input"
                         )
                         llm_api_key = gr.Textbox(
                             label="API Key",
                             type="password",
-                            info="Your API key"
+                            placeholder="Enter your API key here",
+                            info="Your LLM provider API key (stored securely)",
+                            elem_classes="key-input"
                         )
 
-            with gr.TabItem("🌐 Browser Settings", id=3):
-                with gr.Group():
+            with gr.TabItem("🔧 Browser Settings", elem_classes="tab-content"):
+                with gr.Group(elem_classes="gr-form"):
+                    gr.Markdown("### Browser Configuration")
                     with gr.Row():
-                        use_own_browser = gr.Checkbox(
-                            label="Use Own Browser",
-                            value=False,
-                            info="Use your existing browser instance"
-                        )
-                        headless = gr.Checkbox(
-                            label="Headless Mode",
-                            value=False,
-                            info="Run browser without GUI"
-                        )
-                        disable_security = gr.Checkbox(
-                            label="Disable Security",
-                            value=True,
-                            info="Disable browser security features"
-                        )
-                    
-                    with gr.Row():
-                        window_w = gr.Number(
-                            label="Window Width",
-                            value=1920,
-                            info="Browser window width"
-                        )
-                        window_h = gr.Number(
-                            label="Window Height",
-                            value=1080,
-                            info="Browser window height"
-                        )
+                        with gr.Column(scale=2):
+                            use_own_browser = gr.Checkbox(
+                                label="Use Own Browser",
+                                value=False,
+                                info="Use your local browser instance instead of a new one",
+                                elem_classes="browser-toggle"
+                            )
+                            headless = gr.Checkbox(
+                                label="Headless Mode",
+                                value=False,
+                                info="Run browser without visible window (faster execution)",
+                                elem_classes="headless-toggle"
+                            )
+                            disable_security = gr.Checkbox(
+                                label="Disable Security",
+                                value=True,
+                                info="⚠️ Disable browser security features (use with caution)",
+                                elem_classes="security-toggle"
+                            )
+                        
+                        with gr.Column(scale=3):
+                            gr.Markdown("### Window Dimensions")
+                            with gr.Row():
+                                window_w = gr.Number(
+                                    label="Width (px)",
+                                    value=1920,
+                                    info="Browser window width in pixels",
+                                    elem_classes="dimension-input"
+                                )
+                                window_h = gr.Number(
+                                    label="Height (px)",
+                                    value=1080,
+                                    info="Browser window height in pixels",
+                                    elem_classes="dimension-input"
+                                )
                     
                     save_recording_path = gr.Textbox(
                         label="Recording Path",
                         placeholder="e.g. ./tmp/record_videos",
                         value="./tmp/record_videos",
-                        info="Path to save browser recordings"
+                        info="Directory path to save browser session recordings",
+                        elem_classes="path-input"
                     )
 
-            with gr.TabItem("📝 Task Settings", id=4):
-                task = gr.Textbox(
-                    label="Task Description",
-                    lines=4,
-                    placeholder="Enter your task here...",
-                    value="go to google.com and type 'OpenAI' click search and give me the first url",
-                    info="Describe what you want the agent to do"
+            with gr.TabItem("📝 Task Definition", elem_classes="tab-content"):
+                with gr.Group(elem_classes="gr-form"):
+                    task = gr.Textbox(
+                        label="Task Description",
+                        lines=5,
+                        placeholder="Describe what you want the agent to do...\nExample: Go to google.com, search for 'OpenAI', and return the first result URL",
+                        value="go to google.com and type 'OpenAI' click search and give me the first url",
+                        info="Provide clear instructions for what you want the agent to accomplish",
+                        elem_classes="task-input"
+                    )
+                    add_infos = gr.Textbox(
+                        label="Additional Information",
+                        lines=3,
+                        placeholder="Add any helpful context or hints for the agent...",
+                        info="Optional: Provide extra context or specific instructions to help the agent",
+                        elem_classes="hints-input"
+                    )
+
+        with gr.Row(elem_classes="action-buttons"):
+            run_button = gr.Button("▶️ Start Task", variant="primary", scale=2, elem_classes="run-button")
+            stop_button = gr.Button("⏹️ Stop Task", variant="stop", scale=1, elem_classes="stop-button")
+
+        with gr.Group(elem_classes="output-panel"):
+            gr.Markdown("### 📊 Task Results")
+            with gr.Row():
+                with gr.Column():
+                    final_result_output = gr.TextArea(
+                        label="Final Result",
+                        lines=4,
+                        show_copy_button=True,
+                        elem_classes="result-output"
+                    )
+                    model_thoughts_output = gr.TextArea(
+                        label="Agent Thoughts",
+                        lines=4,
+                        show_copy_button=True,
+                        elem_classes="thoughts-output"
+                    )
+                with gr.Column():
+                    model_actions_output = gr.TextArea(
+                        label="Actions Taken",
+                        lines=4,
+                        show_copy_button=True,
+                        elem_classes="actions-output"
+                    )
+                    errors_output = gr.TextArea(
+                        label="Errors & Warnings",
+                        lines=4,
+                        show_copy_button=True,
+                        elem_classes="errors-output"
+                    )
+
+            with gr.Row():
+                status_output = gr.HTML(
+                    value='<div class="status-indicator">Ready to start</div>',
+                    label="Status",
+                    elem_classes="status-display"
                 )
-                add_infos = gr.Textbox(
-                    label="Additional Information",
-                    lines=3,
-                    placeholder="Add any helpful context or instructions...",
-                    info="Optional hints to help the LLM complete the task"
-                )
 
-                with gr.Row():
-                    run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
-                    stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
+        # Event handlers
+        def update_status(is_running=True):
+            if is_running:
+                return '<div class="status-indicator status-success">Running...</div>'
+            return '<div class="status-indicator">Ready</div>'
 
-            with gr.TabItem("🎬 Recordings", id=5):
-                recording_display = gr.Video(label="Latest Recording")
+        async def run_task(*args):
+            try:
+                status = update_status(True)
+                logger.info("Starting browser agent task")
+                result = await run_browser_agent(*args)
+                logger.info("Browser agent task completed")
+                return [*result, update_status(False)]
+            except Exception as e:
+                import traceback
+                error_msg = str(e) + "\n" + traceback.format_exc()
+                logger.error(f"Error in browser agent task: {error_msg}")
+                return ["", error_msg, "", "", '<div class="status-indicator status-error">Error</div>']
 
-                with gr.Group():
-                    gr.Markdown("### Results")
-                    with gr.Row():
-                        with gr.Column():
-                            final_result_output = gr.Textbox(
-                                label="Final Result",
-                                lines=3,
-                                show_label=True
-                            )
-                        with gr.Column():
-                            errors_output = gr.Textbox(
-                                label="Errors",
-                                lines=3,
-                                show_label=True
-                            )
-                    with gr.Row():
-                        with gr.Column():
-                            model_actions_output = gr.Textbox(
-                                label="Model Actions",
-                                lines=3,
-                                show_label=True
-                            )
-                        with gr.Column():
-                            model_thoughts_output = gr.Textbox(
-                                label="Model Thoughts",
-                                lines=3,
-                                show_label=True
-                            )
-
-        # Run button click handler
+        # Connect the run button
         run_button.click(
-            fn=run_browser_agent,
+            fn=run_task,
             inputs=[
                 agent_type, llm_provider, llm_model_name, llm_temperature,
                 llm_base_url, llm_api_key, use_own_browser, headless,
                 disable_security, window_w, window_h, save_recording_path,
                 task, add_infos, max_steps, use_vision
             ],
-            outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display]
+            outputs=[
+                final_result_output, errors_output, 
+                model_actions_output, model_thoughts_output,
+                status_output
+            ],
+            api_name="run_agent"  # Enable API access
         )
 
-    return demo
+        # Simple status update for stop button
+        stop_button.click(
+            fn=lambda: '<div class="status-indicator status-error">Stopped</div>',
+            outputs=[status_output],
+            api_name=False  # Disable API access for stop button
+        )
 
-def main():
-    parser = argparse.ArgumentParser(description="Gradio UI for Browser Agent")
-    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
-    parser.add_argument("--port", type=int, default=7788, help="Port to listen on")
-    parser.add_argument("--theme", type=str, default="Ocean", choices=theme_map.keys(), help="Theme to use for the UI")
-    parser.add_argument("--dark-mode", action="store_true", help="Enable dark mode")
-    args = parser.parse_args()
+    # Launch with queue enabled for async operation
+    demo.queue().launch(
+        server_name=args.ip,
+        server_port=args.port,
+        show_api=False,
+        share=False
+    )
 
-    demo = create_ui(theme_name=args.theme)
-    demo.launch(server_name=args.ip, server_port=args.port)
 
 if __name__ == '__main__':
     main()
