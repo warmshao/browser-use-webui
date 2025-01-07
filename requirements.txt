@@ -1,4 +1,4 @@
-browser-use==0.1.17
+browser-use==0.1.18
 langchain-google-genai
 pyperclip
 gradio
