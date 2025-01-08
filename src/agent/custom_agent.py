@@ -154,32 +154,58 @@ class CustomAgent(Agent):
         try:
             structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
             response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-
             parsed: AgentOutput = response['parsed']
             # cut the number of actions to max_actions_per_step
             parsed.action = parsed.action[: self.max_actions_per_step]
             self._log_response(parsed)
             self.n_steps += 1
-
             return parsed
         except Exception as e:
-            # If something goes wrong, try to invoke the LLM again without structured output,
-            # and Manually parse the response. Temporarily solution for DeepSeek
+            # If structured output fails, try manual JSON parsing
             ret = self.llm.invoke(input_messages)
-            if isinstance(ret.content, list):
-                parsed_json = json.loads(ret.content[0].replace("```json", "").replace("```", ""))
+            content = ret.content
+            
+            # Clean up the content to ensure valid JSON
+            if "```json" in content:
+                # Extract JSON from code block
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                if end == -1:
+                    end = len(content)
+                content = content[start:end]
             else:
-                parsed_json = json.loads(ret.content.replace("```json", "").replace("```", ""))
-            parsed: AgentOutput = self.AgentOutput(**parsed_json)
-            if parsed is None:
-                raise ValueError(f'Could not parse response.')
-
-            # cut the number of actions to max_actions_per_step
-            parsed.action = parsed.action[: self.max_actions_per_step]
-            self._log_response(parsed)
-            self.n_steps += 1
-
-            return parsed
+                # Try to find JSON object
+                start = content.find("{")
+                end = content.rfind("}") + 1
+                if start >= 0 and end > start:
+                    content = content[start:end]
+                    
+            # Clean up any remaining whitespace or newlines
+            content = content.strip()
+            
+            try:
+                parsed_json = json.loads(content)
+                parsed: AgentOutput = self.AgentOutput(**parsed_json)
+                # cut the number of actions to max_actions_per_step
+                parsed.action = parsed.action[: self.max_actions_per_step]
+                self._log_response(parsed)
+                self.n_steps += 1
+                return parsed
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON: {str(e)}")
+                logger.error(f"Content was: {content}")
+                # Create a default response
+                from .custom_views import CustomAgentBrain
+                return CustomAgentOutput(
+                    current_state=CustomAgentBrain(
+                        prev_action_evaluation="Failed - Error parsing response",
+                        important_contents="None",
+                        completed_contents="",
+                        thought="Failed to parse the response. Will retry with a simpler action.",
+                        summary="Retry with simpler action"
+                    ),
+                    action=[{"go_to_url": {"url": "https://www.google.com"}}]
+                )
 
     @time_execution_async("--step")
     async def step(self, step_info: Optional[CustomAgentStepInfo] = None) -> None:
