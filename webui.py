@@ -46,10 +46,15 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_call_in_content,
+        enable_proxy
 ):
     # Ensure the recording directory exists
     os.makedirs(save_recording_path, exist_ok=True)
+
+    # Get proxy url from environment if enabled and convert to proper format
+    proxy_url = os.getenv("PROXY_URL", "")
+    proxy_config = {"server": proxy_url} if enable_proxy and proxy_url else None
 
     # Get the list of existing videos before the agent runs
     existing_videos = set(
@@ -77,7 +82,8 @@ async def run_browser_agent(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content
+            tool_call_in_content=tool_call_in_content,
+            proxy_config=proxy_config
         )
     elif agent_type == "custom":
         final_result, errors, model_actions, model_thoughts = await run_custom_agent(
@@ -93,7 +99,8 @@ async def run_browser_agent(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content
+            tool_call_in_content=tool_call_in_content,
+            proxy_config=proxy_config
         )
     else:
         raise ValueError(f"Invalid agent type: {agent_type}")
@@ -123,14 +130,15 @@ async def run_org_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
-
+        tool_call_in_content,
+        proxy_config
 ):
     browser = Browser(
         config=BrowserConfig(
             headless=headless,
             disable_security=disable_security,
             extra_chromium_args=[f"--window-size={window_w},{window_h}"],
+            proxy=proxy_config
         )
     )
     async with await browser.new_context(
@@ -174,7 +182,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_call_in_content,
+        proxy_config
 ):
     controller = CustomController()
     playwright = None
@@ -197,7 +206,7 @@ async def run_custom_agent(
                 user_data_dir=chrome_use_data,
                 executable_path=chrome_exe,
                 no_viewport=False,
-                headless=headless,  # 保持浏览器窗口可见
+                headless=headless,  # Keep browser window visible
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
@@ -207,6 +216,7 @@ async def run_custom_agent(
                 ignore_https_errors=disable_security,
                 record_video_dir=save_recording_path if save_recording_path else None,
                 record_video_size={"width": window_w, "height": window_h},
+                proxy=proxy_config
             )
         else:
             browser_context_ = None
@@ -216,6 +226,7 @@ async def run_custom_agent(
                 headless=headless,
                 disable_security=disable_security,
                 extra_chromium_args=[f"--window-size={window_w},{window_h}"],
+                proxy=proxy_config
             )
         )
         async with await browser.new_context(
@@ -396,6 +407,12 @@ def create_ui(theme_name="Ocean"):
                         llm_api_key = gr.Textbox(
                             label="API Key", type="password", info="Your API key"
                         )
+                    
+                    enable_proxy = gr.Checkbox(
+                        label="Use Proxy",
+                        value=False,
+                        info="Enable proxy settings from .env file for API requests",
+                    )
 
             with gr.TabItem("🌐 Browser Settings", id=3):
                 with gr.Group():
@@ -499,7 +516,8 @@ def create_ui(theme_name="Ocean"):
                 max_steps,
                 use_vision,
                 max_actions_per_step,
-                tool_call_in_content
+                tool_call_in_content,
+                enable_proxy
             ],
             outputs=[
                 final_result_output,
