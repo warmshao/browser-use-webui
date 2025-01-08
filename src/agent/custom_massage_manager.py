@@ -94,26 +94,47 @@ class CustomMassageManager(MessageManager):
     ) -> None:
         """Add browser state as human message"""
 
-        # if keep in memory, add to directly to history and add state without result
-        if result:
-            for r in result:
-                if r.include_in_memory:
-                    if r.extracted_content:
-                        msg = HumanMessage(content=str(r.extracted_content))
-                        self._add_message_with_tokens(msg)
-                    if r.error:
-                        msg = HumanMessage(
-                            content=str(r.error)[-self.max_error_length:]
-                        )
-                        self._add_message_with_tokens(msg)
-                    result = None  # if result in history, we dont want to add it again
+        try:
+            # if keep in memory, add to directly to history and add state without result
+            if result:
+                for r in result:
+                    if r and r.include_in_memory:
+                        if r.extracted_content:
+                            msg = HumanMessage(content=str(r.extracted_content))
+                            self._add_message_with_tokens(msg)
+                        if r.error:
+                            msg = HumanMessage(
+                                content=str(r.error)[-self.max_error_length :]
+                            )
+                            self._add_message_with_tokens(msg)
+                        result = None  # if result in history, we dont want to add it again
 
-        # otherwise add state message and result to next message (which will not stay in memory)
-        state_message = CustomAgentMessagePrompt(
-            state,
-            result,
-            include_attributes=self.include_attributes,
-            max_error_length=self.max_error_length,
-            step_info=step_info,
-        ).get_user_message()
-        self._add_message_with_tokens(state_message)
+            # Create state message with safe attribute access
+            state_message = CustomAgentMessagePrompt(
+                state,
+                result,
+                include_attributes=self.include_attributes,
+                max_error_length=self.max_error_length,
+                step_info=step_info,
+            ).get_user_message()
+            
+            if state_message and hasattr(state_message, 'content'):
+                if isinstance(state_message.content, str):
+                    self._add_message_with_tokens(state_message)
+                elif isinstance(state_message.content, list):
+                    # Handle multi-modal messages (text + image)
+                    has_valid_content = False
+                    for item in state_message.content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'text' and item.get('text'):
+                                has_valid_content = True
+                            elif item.get('type') == 'image_url' and item.get('image_url', {}).get('url'):
+                                has_valid_content = True
+                    if has_valid_content:
+                        self._add_message_with_tokens(state_message)
+                
+        except Exception as e:
+            logger.error(f"Error in add_state_message: {str(e)}")
+            # Create a basic message if state processing fails
+            msg = HumanMessage(content="Error processing browser state")
+            self._add_message_with_tokens(msg)
