@@ -41,53 +41,26 @@ class CustomAgent(Agent):
     def __init__(
             self,
             task: str,
-            llm: BaseChatModel,
             add_infos: str = "",
-            browser: Browser | None = None,
-            browser_context: BrowserContext | None = None,
-            controller: Controller = Controller(),
             use_vision: bool = True,
-            save_conversation_path: Optional[str] = None,
-            max_failures: int = 5,
-            retry_delay: int = 10,
+            llm: Optional[BaseChatModel] = None,
+            browser_context: Optional[BrowserContext] = None,
+            controller: Optional[Controller] = None,
             system_prompt_class: Type[SystemPrompt] = SystemPrompt,
-            max_input_tokens: int = 128000,
-            validate_output: bool = False,
-            include_attributes: list[str] = [
-                "title",
-                "type",
-                "name",
-                "role",
-                "tabindex",
-                "aria-label",
-                "placeholder",
-                "value",
-                "alt",
-                "aria-expanded",
-            ],
-            max_error_length: int = 400,
             max_actions_per_step: int = 10,
             tool_call_in_content: bool = True,
     ):
         super().__init__(
             task=task,
+            use_vision=use_vision,
             llm=llm,
-            browser=browser,
             browser_context=browser_context,
             controller=controller,
-            use_vision=use_vision,
-            save_conversation_path=save_conversation_path,
-            max_failures=max_failures,
-            retry_delay=retry_delay,
             system_prompt_class=system_prompt_class,
-            max_input_tokens=max_input_tokens,
-            validate_output=validate_output,
-            include_attributes=include_attributes,
-            max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
         )
         self.add_infos = add_infos
+        self.tool_call_in_content = tool_call_in_content
         self.message_manager = CustomMassageManager(
             llm=self.llm,
             task=self.task,
@@ -97,7 +70,7 @@ class CustomAgent(Agent):
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
             max_actions_per_step=self.max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
+            tool_call_in_content=self.tool_call_in_content,
         )
 
     def _setup_action_models(self) -> None:
