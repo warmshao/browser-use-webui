@@ -36,6 +36,7 @@ from src.agent.custom_prompts import CustomSystemPrompt
 
 from src.utils import utils
 
+
 async def run_browser_agent(
         agent_type,
         llm_provider,
@@ -52,14 +53,21 @@ async def run_browser_agent(
         task,
         add_infos,
         max_steps,
-        use_vision
+        use_vision,
+        use_proxy,
+        proxy_url
 ):
     # Ensure the recording directory exists
     os.makedirs(save_recording_path, exist_ok=True)
 
     # Get the list of existing videos before the agent runs
-    existing_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) + 
+    existing_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) +
                           glob.glob(os.path.join(save_recording_path, '*.[wW][eE][bB][mM]')))
+
+    # Set proxy if enabled
+    if use_proxy:
+        os.environ['http_proxy'] = proxy_url
+        os.environ['https_proxy'] = proxy_url
 
     # Run the agent
     llm = utils.get_llm_model(
@@ -99,7 +107,7 @@ async def run_browser_agent(
         raise ValueError(f"Invalid agent type: {agent_type}")
 
     # Get the list of videos after the agent runs
-    new_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) + 
+    new_videos = set(glob.glob(os.path.join(save_recording_path, '*.[mM][pP]4')) +
                      glob.glob(os.path.join(save_recording_path, '*.[wW][eE][bB][mM]')))
 
     # Find the newly created video
@@ -108,6 +116,7 @@ async def run_browser_agent(
         latest_video = list(new_videos - existing_videos)[0]  # Get the first new video
 
     return final_result, errors, model_actions, model_thoughts, latest_video
+
 
 async def run_org_agent(
         llm,
@@ -149,6 +158,7 @@ async def run_org_agent(
         model_thoughts = history.model_thoughts()
     await browser.close()
     return final_result, errors, model_actions, model_thoughts
+
 
 async def run_custom_agent(
         llm,
@@ -256,6 +266,7 @@ theme_map = {
     "Ocean": Ocean()
 }
 
+
 def create_ui(theme_name="Ocean"):
     css = """
     .gradio-container {
@@ -283,7 +294,7 @@ def create_ui(theme_name="Ocean"):
         }
     }
     """
-    
+
     with gr.Blocks(title="Browser Use WebUI", theme=theme_map[theme_name], css=css, js=js) as demo:
         with gr.Row():
             gr.Markdown(
@@ -293,7 +304,7 @@ def create_ui(theme_name="Ocean"):
                 """,
                 elem_classes=["header-text"]
             )
-        
+
         with gr.Tabs() as tabs:
             with gr.TabItem("🤖 Agent Settings", id=1):
                 with gr.Group():
@@ -341,12 +352,24 @@ def create_ui(theme_name="Ocean"):
                     with gr.Row():
                         llm_base_url = gr.Textbox(
                             label="Base URL",
+                            value="https://generativelanguage.googleapis.com/v1beta/openai/",
                             info="API endpoint URL (if required)"
                         )
                         llm_api_key = gr.Textbox(
                             label="API Key",
                             type="password",
                             info="Your API key"
+                        )
+                    with gr.Row():
+                        use_proxy = gr.Checkbox(
+                            label="Use Proxy",
+                            value=True,
+                            info="Enable proxy for API requests"
+                        )
+                        proxy_url = gr.Textbox(
+                            label="Proxy URL",
+                            value="http://127.0.0.1:7890",
+                            info="Your proxy URL (e.g., http://127.0.0.1:7890)"
                         )
 
             with gr.TabItem("🌐 Browser Settings", id=3):
@@ -367,7 +390,7 @@ def create_ui(theme_name="Ocean"):
                             value=True,
                             info="Disable browser security features"
                         )
-                    
+
                     with gr.Row():
                         window_w = gr.Number(
                             label="Window Width",
@@ -379,7 +402,7 @@ def create_ui(theme_name="Ocean"):
                             value=1080,
                             info="Browser window height"
                         )
-                    
+
                     save_recording_path = gr.Textbox(
                         label="Recording Path",
                         placeholder="e.g. ./tmp/record_videos",
@@ -445,12 +468,13 @@ def create_ui(theme_name="Ocean"):
                 agent_type, llm_provider, llm_model_name, llm_temperature,
                 llm_base_url, llm_api_key, use_own_browser, headless,
                 disable_security, window_w, window_h, save_recording_path,
-                task, add_infos, max_steps, use_vision
+                task, add_infos, max_steps, use_vision, use_proxy, proxy_url
             ],
             outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display]
         )
 
     return demo
+
 
 def main():
     parser = argparse.ArgumentParser(description="Gradio UI for Browser Agent")
@@ -462,6 +486,7 @@ def main():
 
     demo = create_ui(theme_name=args.theme)
     demo.launch(server_name=args.ip, server_port=args.port)
+
 
 if __name__ == '__main__':
     main()
