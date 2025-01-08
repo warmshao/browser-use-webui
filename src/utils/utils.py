@@ -12,7 +12,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-
+import gradio as gr
 
 def get_llm_model(provider: str, **kwargs):
     """
@@ -106,8 +106,34 @@ def get_llm_model(provider: str, **kwargs):
         )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
+    
+# Predefined model names for common providers
+model_names = {
+    "anthropic": ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
+    "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
+    "deepseek": ["deepseek-chat"],
+    "gemini": ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-1219" ],
+    "ollama": ["qwen2.5:7b", "llama2:7b"],
+    "azure_openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"]
+}
 
+# Callback to update the model name dropdown based on the selected provider
+def update_model_dropdown(llm_provider, api_key=None, base_url=None):
+    """
+    Update the model name dropdown with predefined models for the selected provider.
+    """
+    # Use API keys from .env if not provided
+    if not api_key:
+        api_key = os.getenv(f"{llm_provider.upper()}_API_KEY", "")
+    if not base_url:
+        base_url = os.getenv(f"{llm_provider.upper()}_BASE_URL", "")
 
+    # Use predefined models for the selected provider
+    if llm_provider in model_names:
+        return gr.Dropdown(choices=model_names[llm_provider], value=model_names[llm_provider][0], interactive=True)
+    else:
+        return gr.Dropdown(choices=[], value="", interactive=True, allow_custom_value=True)
+        
 def encode_image(img_path):
     if not img_path:
         return None

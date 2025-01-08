@@ -399,10 +399,15 @@ def create_ui(theme_name="Ocean"):
                     )
                     with gr.Row():
                         llm_base_url = gr.Textbox(
-                            label="Base URL", info="API endpoint URL (if required)"
+                            label="Base URL",
+                            value=os.getenv(f"{llm_provider.value.upper()}_BASE_URL ", ""),  # Default to .env value
+                            info="API endpoint URL (if required)"
                         )
                         llm_api_key = gr.Textbox(
-                            label="API Key", type="password", info="Your API key"
+                            label="API Key",
+                            type="password",
+                            value=os.getenv(f"{llm_provider.value.upper()}_API_KEY", ""),  # Default to .env value
+                            info="Your API key (leave blank to use .env)"
                         )
                     
                     # Proxy configuration
