@@ -5,6 +5,8 @@
 # @Project : browser-use-webui
 # @FileName: webui.py
 
+import pdb
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,6 +14,12 @@ import argparse
 import os
 
 import gradio as gr
+import argparse
+
+
+from gradio.themes import Base, Default, Soft, Monochrome, Glass, Origin, Citrus, Ocean
+import asyncio
+import os, glob
 from browser_use.agent.service import Agent
 from browser_use.browser.browser import Browser, BrowserConfig
 from browser_use.browser.context import (
@@ -26,7 +34,7 @@ from src.browser.custom_browser import CustomBrowser
 from src.browser.custom_context import BrowserContextConfig
 from src.controller.custom_controller import CustomController
 from src.utils import utils
-
+from src.utils.utils import update_model_dropdown
 
 async def run_browser_agent(
         agent_type,
@@ -41,6 +49,7 @@ async def run_browser_agent(
         window_w,
         window_h,
         save_recording_path,
+        enable_recording,
         task,
         add_infos,
         max_steps,
@@ -49,21 +58,28 @@ async def run_browser_agent(
         tool_call_in_content,
         use_proxy
 ):
-    # Ensure the recording directory exists
-    os.makedirs(save_recording_path, exist_ok=True)
-
-    # Get the list of existing videos before the agent runs
-    existing_videos = set(
-        glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
-        + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
-    )
-
     # Configure proxy settings
     if use_proxy:
         proxy_url = os.getenv("PROXY_URL", "")
         if proxy_url:
             os.environ["http_proxy"] = proxy_url
             os.environ["https_proxy"] = proxy_url
+
+    # Disable recording if the checkbox is unchecked
+    if not enable_recording:
+        save_recording_path = None
+
+    # Ensure the recording directory exists if recording is enabled
+    if save_recording_path:
+        os.makedirs(save_recording_path, exist_ok=True)
+
+    # Get the list of existing videos before the agent runs
+    existing_videos = set()
+    if save_recording_path:
+        existing_videos = set(
+            glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
+            + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
+        )
 
     # Run the agent
     llm = utils.get_llm_model(
@@ -106,16 +122,15 @@ async def run_browser_agent(
     else:
         raise ValueError(f"Invalid agent type: {agent_type}")
 
-    # Get the list of videos after the agent runs
-    new_videos = set(
-        glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
-        + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
-    )
-
-    # Find the newly created video
+    # Get the list of videos after the agent runs (if recording is enabled)
     latest_video = None
-    if new_videos - existing_videos:
-        latest_video = list(new_videos - existing_videos)[0]  # Get the first new video
+    if save_recording_path:
+        new_videos = set(
+            glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
+            + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
+        )
+        if new_videos - existing_videos:
+            latest_video = list(new_videos - existing_videos)[0]  # Get the first new video
 
     return final_result, errors, model_actions, model_thoughts, latest_video
 
@@ -276,11 +291,6 @@ async def run_custom_agent(
         await browser.close()
     return final_result, errors, model_actions, model_thoughts
 
-
-import glob
-
-from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft
-
 # Define the theme map globally
 theme_map = {
     "Default": Default(),
@@ -290,6 +300,7 @@ theme_map = {
     "Origin": Origin(),
     "Citrus": Citrus(),
     "Ocean": Ocean(),
+    "Base": Base()
 }
 
 
@@ -372,22 +383,17 @@ def create_ui(theme_name="Ocean"):
             with gr.TabItem("🔧 LLM Configuration", id=2):
                 with gr.Group():
                     llm_provider = gr.Dropdown(
-                        [
-                            "anthropic",
-                            "openai",
-                            "gemini",
-                            "azure_openai",
-                            "deepseek",
-                            "ollama",
-                        ],
+                        ["anthropic", "openai", "deepseek", "gemini", "ollama", "azure_openai"],
                         label="LLM Provider",
-                        value="openai",
-                        info="Select your preferred language model provider",
+                        value="",
+                        info="Select your preferred language model provider"
                     )
-                    llm_model_name = gr.Textbox(
+                    llm_model_name = gr.Dropdown(
                         label="Model Name",
-                        value="gpt-4o",
-                        info="Specify the model to use",
+                        value="",
+                        interactive=True,
+                        allow_custom_value=True,  # Allow users to input custom model names
+                        info="Select a model from the dropdown or type a custom model name"
                     )
                     llm_temperature = gr.Slider(
                         minimum=0.0,
@@ -395,7 +401,7 @@ def create_ui(theme_name="Ocean"):
                         value=1.0,
                         step=0.1,
                         label="Temperature",
-                        info="Controls randomness in model outputs",
+                        info="Controls randomness in model outputs"
                     )
                     with gr.Row():
                         llm_base_url = gr.Textbox(
@@ -435,6 +441,11 @@ def create_ui(theme_name="Ocean"):
                             value=True,
                             info="Disable browser security features",
                         )
+                        enable_recording = gr.Checkbox(
+                            label="Enable Recording",
+                            value=True,
+                            info="Enable saving browser recordings",
+                        )
 
                     with gr.Row():
                         window_w = gr.Number(
@@ -453,6 +464,7 @@ def create_ui(theme_name="Ocean"):
                         placeholder="e.g. ./tmp/record_videos",
                         value="./tmp/record_videos",
                         info="Path to save browser recordings",
+                        interactive=True,  # Allow editing only if recording is enabled
                     )
 
             with gr.TabItem("🤖 Run Agent", id=4):
@@ -474,7 +486,7 @@ def create_ui(theme_name="Ocean"):
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
 
-            with gr.TabItem("🎬 Recordings", id=5):
+            with gr.TabItem("📊 Results", id=5):
                 recording_display = gr.Video(label="Latest Recording")
 
                 with gr.Group():
@@ -497,48 +509,79 @@ def create_ui(theme_name="Ocean"):
                             model_thoughts_output = gr.Textbox(
                                 label="Model Thoughts", lines=3, show_label=True
                             )
+            
+            with gr.TabItem("🎥 Recordings", id=6):
+                def list_recordings(save_recording_path):
+                    if not os.path.exists(save_recording_path):
+                        return []
+                    
+                    # Get all video files
+                    recordings = glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4")) + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
+                    
+                    # Sort recordings by creation time (oldest first)
+                    recordings.sort(key=os.path.getctime)
+                    
+                    # Add numbering to the recordings
+                    numbered_recordings = []
+                    for idx, recording in enumerate(recordings, start=1):
+                        filename = os.path.basename(recording)
+                        numbered_recordings.append((recording, f"{idx}. {filename}"))
+                    
+                    return numbered_recordings
+
+                recordings_gallery = gr.Gallery(
+                    label="Recordings",
+                    value=list_recordings("./tmp/record_videos"),
+                    columns=3,
+                    height="auto",
+                    object_fit="contain"
+                )
+
+                refresh_button = gr.Button("🔄 Refresh Recordings", variant="secondary")
+                refresh_button.click(
+                    fn=list_recordings,
+                    inputs=save_recording_path,
+                    outputs=recordings_gallery
+                )
+
+        # Attach the callback to the LLM provider dropdown
+        llm_provider.change(
+            lambda provider, api_key, base_url: update_model_dropdown(provider, api_key, base_url),
+            inputs=[llm_provider, llm_api_key, llm_base_url],
+            outputs=llm_model_name
+        )  
+
+        # Add this after defining the components
+        enable_recording.change(
+            lambda enabled: gr.update(interactive=enabled),
+            inputs=enable_recording,
+            outputs=save_recording_path
+        )
 
         # Run button click handler
         run_button.click(
             fn=run_browser_agent,
             inputs=[
-                agent_type, llm_provider, llm_model_name, llm_temperature,
-                llm_base_url, llm_api_key, use_own_browser, headless,
-                disable_security, window_w, window_h, save_recording_path,
-                task, add_infos, max_steps, use_vision, max_actions_per_step,
-                tool_call_in_content, use_proxy
+                agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
+                use_own_browser, headless, disable_security, window_w, window_h, save_recording_path,
+                enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content,
+                use_proxy
             ],
-            outputs=[
-                final_result_output,
-                errors_output,
-                model_actions_output,
-                model_thoughts_output,
-                recording_display,
-            ],
+            outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display],
         )
 
     return demo
 
-
 def main():
     parser = argparse.ArgumentParser(description="Gradio UI for Browser Agent")
-    parser.add_argument(
-        "--ip", type=str, default="127.0.0.1", help="IP address to bind to"
-    )
+    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
     parser.add_argument("--port", type=int, default=7788, help="Port to listen on")
-    parser.add_argument(
-        "--theme",
-        type=str,
-        default="Ocean",
-        choices=theme_map.keys(),
-        help="Theme to use for the UI",
-    )
+    parser.add_argument("--theme", type=str, default="Ocean", choices=theme_map.keys(), help="Theme to use for the UI")
     parser.add_argument("--dark-mode", action="store_true", help="Enable dark mode")
     args = parser.parse_args()
 
     demo = create_ui(theme_name=args.theme)
     demo.launch(server_name=args.ip, server_port=args.port)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
