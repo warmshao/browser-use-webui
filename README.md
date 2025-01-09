@@ -61,44 +61,6 @@ playwright install
     - Open the WebUI in a non-Chrome browser, such as Firefox or Edge. This is important because the persistent browser context will use the Chrome data when running the agent.
     - Check the "Use Own Browser" option within the Browser Settings.
 
-### Options:
-
-### `--theme`
-
-- **Type**: `str`
-- **Default**: `Ocean`
-- **Description**: Specifies the theme for the user interface.
-- **Options**:
-  The available themes are defined in the `theme_map` dictionary. Below are the options you can choose from:
-  - **Default**: The standard theme with a balanced design.
-  - **Soft**: A gentle, muted color scheme for a relaxed viewing experience.
-  - **Monochrome**: A grayscale theme with minimal color for simplicity and focus.
-  - **Glass**: A sleek, semi-transparent design for a modern appearance.
-  - **Origin**: A classic, retro-inspired theme for a nostalgic feel.
-  - **Citrus**: A vibrant, citrus-inspired palette with bright and fresh colors.
-  - **Ocean** (default): A blue, ocean-inspired theme providing a calming effect.
-
-**Example**:
-
-```bash
-python webui.py --ip 127.0.0.1 --port 7788 --theme Glass
-```
-
-### `--dark-mode`
-
-- **Type**: `boolean`
-- **Default**: Disabled
-- **Description**: Enables dark mode for the user interface. This is a simple toggle; including the flag activates dark mode, while omitting it keeps the interface in light mode.
-- **Options**:
-  - **Enabled (`--dark-mode`)**: Activates dark mode, switching the interface to a dark color scheme for better visibility in low-light environments.
-  - **Disabled (default)**: Keeps the interface in the default light mode.
-
-**Example**:
-
-```bash
-python webui.py --ip 127.0.0.1 --port 7788 --dark-mode
-```
-
 ## (Optional) Configure Environment Variables
 
 Copy `.env.example` to `.env` and set your environment variables, including API keys for the LLM. With

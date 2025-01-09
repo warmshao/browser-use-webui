@@ -55,8 +55,16 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_call_in_content,
+        use_proxy
 ):
+    # Configure proxy settings
+    if use_proxy:
+        proxy_url = os.getenv("PROXY_URL", "")
+        if proxy_url:
+            os.environ["http_proxy"] = proxy_url
+            os.environ["https_proxy"] = proxy_url
+
     # Disable recording if the checkbox is unchecked
     if not enable_recording:
         save_recording_path = None
@@ -408,6 +416,13 @@ def create_ui(theme_name="Ocean"):
                             info="Your API key (leave blank to use .env)"
                         )
                     
+                    # Proxy configuration
+                    use_proxy = gr.Checkbox(
+                        label="Use Proxy",
+                        value=os.getenv("USE_PROXY", "false").lower() == "true",
+                        info="Enable proxy for API requests"
+                    )
+
             with gr.TabItem("🌐 Browser Settings", id=3):
                 with gr.Group():
                     with gr.Row():
@@ -542,14 +557,15 @@ def create_ui(theme_name="Ocean"):
             inputs=enable_recording,
             outputs=save_recording_path
         )
-          
+
         # Run button click handler
         run_button.click(
             fn=run_browser_agent,
             inputs=[
                 agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                 use_own_browser, headless, disable_security, window_w, window_h, save_recording_path,
-                enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content
+                enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content,
+                use_proxy
             ],
             outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display],
         )
