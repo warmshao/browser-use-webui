@@ -9,7 +9,7 @@ import logging
 import pdb
 import traceback
 from typing import Optional, Type
-
+import os
 from browser_use.agent.prompts import SystemPrompt
 from browser_use.agent.service import Agent
 from browser_use.agent.views import (
@@ -48,6 +48,7 @@ class CustomAgent(Agent):
             controller: Controller = Controller(),
             use_vision: bool = True,
             save_conversation_path: Optional[str] = None,
+            save_screenshots_path: Optional[str] = None,
             max_failures: int = 5,
             retry_delay: int = 10,
             system_prompt_class: Type[SystemPrompt] = SystemPrompt,
@@ -69,6 +70,7 @@ class CustomAgent(Agent):
             max_actions_per_step: int = 10,
             tool_call_in_content: bool = True,
     ):
+        self.save_screenshots_path = save_screenshots_path
         super().__init__(
             task=task,
             llm=llm,
@@ -190,7 +192,11 @@ class CustomAgent(Agent):
         result: list[ActionResult] = []
 
         try:
-            state = await self.browser_context.get_state(use_vision=self.use_vision)
+            # Create screenshots directory if needed
+            if self.save_screenshots_path:
+                os.makedirs(self.save_screenshots_path, exist_ok=True)
+                
+            state = await self.browser_context.get_state(use_vision=self.use_vision)            
             self.message_manager.add_state_message(state, self._last_result, step_info)
             input_messages = self.message_manager.get_messages()
             model_output = await self.get_next_action(input_messages)
@@ -204,6 +210,14 @@ class CustomAgent(Agent):
                 model_output.action, self.browser_context
             )
             self._last_result = result
+
+            # Take screenshot after actions
+            if self.save_screenshots_path:
+                page = await self.browser_context.get_current_page()
+                if page:
+                    await self.browser_context.remove_highlights()
+                    screenshot_path = os.path.join(self.save_screenshots_path, f"step_{self.n_steps}.png")
+                    await page.screenshot(path=screenshot_path, animations='disabled')
 
             if len(result) > 0 and result[-1].is_done:
                 logger.info(f"📄 Result: {result[-1].extracted_content}")
