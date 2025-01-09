@@ -51,8 +51,8 @@ class CustomMassageManager(MessageManager):
             include_attributes=include_attributes,
             max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
         )
+        self.tool_call_in_content = tool_call_in_content
 
         # Custom: Move Task info to state_message
         self.history = MessageHistory()

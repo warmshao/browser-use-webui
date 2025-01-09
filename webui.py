@@ -30,6 +30,7 @@ from playwright.async_api import async_playwright
 
 from src.agent.custom_agent import CustomAgent
 from src.agent.custom_prompts import CustomSystemPrompt
+from src.agent.custom_massage_manager import CustomMassageManager
 from src.browser.custom_browser import CustomBrowser
 from src.browser.custom_context import BrowserContextConfig
 from src.controller.custom_controller import CustomController
@@ -55,8 +56,20 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_call_in_content,
+        use_proxy
 ):
+    # Configure proxy settings if enabled
+    if use_proxy:
+        proxy_url = os.getenv("PROXY_URL", "")
+        if proxy_url:
+            os.environ["http_proxy"] = proxy_url
+            os.environ["https_proxy"] = proxy_url
+    else:
+        # Clear proxy settings if disabled
+        os.environ.pop("http_proxy", None)
+        os.environ.pop("https_proxy", None)
+
     # Disable recording if the checkbox is unchecked
     if not enable_recording:
         save_recording_path = None
@@ -109,7 +122,8 @@ async def run_browser_agent(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content
+            tool_call_in_content=tool_call_in_content,
+            use_proxy=use_proxy
         )
     else:
         raise ValueError(f"Invalid agent type: {agent_type}")
@@ -189,7 +203,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_call_in_content,
+        use_proxy
 ):
     controller = CustomController()
     playwright = None
@@ -208,21 +223,32 @@ async def run_custom_agent(
             if chrome_use_data == "":
                 chrome_use_data = None
 
-            browser_context_ = await playwright.chromium.launch_persistent_context(
-                user_data_dir=chrome_use_data,
-                executable_path=chrome_exe,
-                no_viewport=False,
-                headless=headless,  # 保持浏览器窗口可见
-                user_agent=(
+            # 配置代理
+            launch_args = {
+                "user_data_dir": chrome_use_data,
+                "executable_path": chrome_exe,
+                "no_viewport": False,
+                "headless": headless,
+                "user_agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
                 ),
-                java_script_enabled=True,
-                bypass_csp=disable_security,
-                ignore_https_errors=disable_security,
-                record_video_dir=save_recording_path if save_recording_path else None,
-                record_video_size={"width": window_w, "height": window_h},
-            )
+                "java_script_enabled": True,
+                "bypass_csp": disable_security,
+                "ignore_https_errors": disable_security,
+                "record_video_dir": save_recording_path if save_recording_path else None,
+                "record_video_size": {"width": window_w, "height": window_h},
+            }
+
+            # 如果启用代理，添加代理配置
+            if use_proxy:
+                proxy_url = os.getenv("PROXY_URL", "")
+                if proxy_url:
+                    launch_args["proxy"] = {
+                        "server": proxy_url
+                    }
+
+            browser_context_ = await playwright.chromium.launch_persistent_context(**launch_args)
         else:
             browser_context_ = None
 
@@ -246,6 +272,16 @@ async def run_custom_agent(
                 ),
                 context=browser_context_,
         ) as browser_context:
+            # 创建消息管理器
+            message_manager = CustomMassageManager(
+                llm=llm,
+                task=task,
+                action_descriptions=controller.registry.get_prompt_description(),
+                system_prompt_class=CustomSystemPrompt,
+                max_actions_per_step=max_actions_per_step,
+                tool_call_in_content=tool_call_in_content
+            )
+            
             agent = CustomAgent(
                 task=task,
                 add_infos=add_infos,
@@ -255,7 +291,7 @@ async def run_custom_agent(
                 controller=controller,
                 system_prompt_class=CustomSystemPrompt,
                 max_actions_per_step=max_actions_per_step,
-                tool_call_in_content=tool_call_in_content
+                message_manager=message_manager  # 传入创建好的消息管理器
             )
             history = await agent.run(max_steps=max_steps)
 
@@ -408,6 +444,13 @@ def create_ui(theme_name="Ocean"):
                             info="Your API key (leave blank to use .env)"
                         )
                     
+                    # Proxy configuration
+                    use_proxy = gr.Checkbox(
+                        label="Use Proxy",
+                        value=os.getenv("USE_PROXY", "false").lower() == "true",
+                        info="Enable proxy for API requests (proxy URL is configured in .env file)"
+                    )
+
             with gr.TabItem("🌐 Browser Settings", id=3):
                 with gr.Group():
                     with gr.Row():
@@ -549,7 +592,8 @@ def create_ui(theme_name="Ocean"):
             inputs=[
                 agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                 use_own_browser, headless, disable_security, window_w, window_h, save_recording_path,
-                enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content
+                enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content,
+                use_proxy
             ],
             outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display],
         )

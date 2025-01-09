@@ -67,7 +67,7 @@ class CustomAgent(Agent):
             ],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
-            tool_call_in_content: bool = True,
+            message_manager: Optional[CustomMassageManager] = None,
     ):
         super().__init__(
             task=task,
@@ -85,20 +85,21 @@ class CustomAgent(Agent):
             include_attributes=include_attributes,
             max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
         )
         self.add_infos = add_infos
-        self.message_manager = CustomMassageManager(
-            llm=self.llm,
-            task=self.task,
-            action_descriptions=self.controller.registry.get_prompt_description(),
-            system_prompt_class=self.system_prompt_class,
-            max_input_tokens=self.max_input_tokens,
-            include_attributes=self.include_attributes,
-            max_error_length=self.max_error_length,
-            max_actions_per_step=self.max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
-        )
+        if message_manager is None:
+            self.message_manager = CustomMassageManager(
+                llm=self.llm,
+                task=self.task,
+                action_descriptions=self.controller.registry.get_prompt_description(),
+                system_prompt_class=self.system_prompt_class,
+                max_input_tokens=self.max_input_tokens,
+                include_attributes=self.include_attributes,
+                max_error_length=self.max_error_length,
+                max_actions_per_step=self.max_actions_per_step,
+            )
+        else:
+            self.message_manager = message_manager
 
     def _setup_action_models(self) -> None:
         """Setup dynamic action models from controller's registry"""
