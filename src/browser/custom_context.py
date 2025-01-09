@@ -5,15 +5,13 @@
 # @Project : browser-use-webui
 # @FileName: context.py
 
-import asyncio
-import base64
 import json
 import logging
 import os
 
-from playwright.async_api import Browser as PlaywrightBrowser
-from browser_use.browser.context import BrowserContext, BrowserContextConfig
 from browser_use.browser.browser import Browser
+from browser_use.browser.context import BrowserContext, BrowserContextConfig
+from playwright.async_api import Browser as PlaywrightBrowser
 
 from .config import BrowserPersistenceConfig
 
@@ -25,9 +23,9 @@ class CustomBrowserContext(BrowserContext):
         self,
         browser: "Browser",
         config: BrowserContextConfig = BrowserContextConfig(),
-        context: BrowserContext = None,
+        context: BrowserContext = None, # type: ignore
     ):
-        super(CustomBrowserContext, self).__init__(browser, config)
+        super(CustomBrowserContext, self).__init__(browser=browser, config=config)
         self.context = context
         self.persistence_config = BrowserPersistenceConfig.from_env()
 
@@ -44,6 +42,7 @@ class CustomBrowserContext(BrowserContext):
 
     async def _create_context(self, browser: PlaywrightBrowser):
         """Creates a new browser context with anti-detection measures and loads cookies if available."""
+        # If we have a context, return it directly
         if self.context:
             return self.context
 
@@ -69,7 +68,7 @@ class CustomBrowserContext(BrowserContext):
                 bypass_csp=self.config.disable_security,
                 ignore_https_errors=self.config.disable_security,
                 record_video_dir=self.config.save_recording_path,
-                record_video_size=self.config.browser_window_size,  # set record video size
+                record_video_size=self.config.browser_window_size,  # set record video size, same as windows size
             )
 
         if self.config.trace_path:

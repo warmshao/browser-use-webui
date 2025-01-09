@@ -7,23 +7,18 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import List, Optional, Type
 
-from langchain_anthropic import ChatAnthropic
+from browser_use.agent.message_manager.service import MessageManager
+from browser_use.agent.message_manager.views import MessageHistory
+from browser_use.agent.prompts import SystemPrompt
+from browser_use.agent.views import ActionResult, AgentStepInfo
+from browser_use.browser.views import BrowserState
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
     HumanMessage,
+    AIMessage
 )
-from langchain_openai import ChatOpenAI
-
-from browser_use.agent.message_manager.views import MessageHistory, MessageMetadata
-from browser_use.agent.prompts import AgentMessagePrompt, SystemPrompt
-from browser_use.agent.views import ActionResult, AgentOutput, AgentStepInfo
-from browser_use.browser.views import BrowserState
-from browser_use.agent.message_manager.service import MessageManager
 
 from .custom_prompts import CustomAgentMessagePrompt
 
@@ -43,14 +38,55 @@ class CustomMassageManager(MessageManager):
             include_attributes: list[str] = [],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
+            tool_call_in_content: bool = False,
     ):
-        super().__init__(llm, task, action_descriptions, system_prompt_class, max_input_tokens,
-                         estimated_tokens_per_character, image_tokens, include_attributes, max_error_length,
-                         max_actions_per_step)
+        super().__init__(
+            llm=llm,
+            task=task,
+            action_descriptions=action_descriptions,
+            system_prompt_class=system_prompt_class,
+            max_input_tokens=max_input_tokens,
+            estimated_tokens_per_character=estimated_tokens_per_character,
+            image_tokens=image_tokens,
+            include_attributes=include_attributes,
+            max_error_length=max_error_length,
+            max_actions_per_step=max_actions_per_step,
+            tool_call_in_content=tool_call_in_content,
+        )
 
-        # Move Task info to state_message
+        # Custom: Move Task info to state_message
         self.history = MessageHistory()
         self._add_message_with_tokens(self.system_prompt)
+        tool_calls = [
+            {
+                'name': 'CustomAgentOutput',
+                'args': {
+                    'current_state': {
+                        'prev_action_evaluation': 'Unknown - No previous actions to evaluate.',
+                        'important_contents': '',
+                        'completed_contents': '',
+                        'thought': 'Now Google is open. Need to type OpenAI to search.',
+                        'summary': 'Type OpenAI to search.',
+                    },
+                    'action': [],
+                },
+                'id': '',
+                'type': 'tool_call',
+            }
+        ]
+        if self.tool_call_in_content:
+            # openai throws error if tool_calls are not responded -> move to content
+            example_tool_call = AIMessage(
+                content=f'{tool_calls}',
+                tool_calls=[],
+            )
+        else:
+            example_tool_call = AIMessage(
+                content=f'',
+                tool_calls=tool_calls,
+            )
+
+        self._add_message_with_tokens(example_tool_call)
 
     def add_state_message(
             self,
@@ -68,7 +104,9 @@ class CustomMassageManager(MessageManager):
                         msg = HumanMessage(content=str(r.extracted_content))
                         self._add_message_with_tokens(msg)
                     if r.error:
-                        msg = HumanMessage(content=str(r.error)[-self.max_error_length:])
+                        msg = HumanMessage(
+                            content=str(r.error)[-self.max_error_length:]
+                        )
                         self._add_message_with_tokens(msg)
                     result = None  # if result in history, we dont want to add it again
 

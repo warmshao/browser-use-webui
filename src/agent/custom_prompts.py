@@ -4,14 +4,12 @@
 # @ProjectName: browser-use-webui
 # @FileName: custom_prompts.py
 
-from datetime import datetime
 from typing import List, Optional
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
-from browser_use.agent.views import ActionResult, AgentStepInfo
+from browser_use.agent.prompts import SystemPrompt
+from browser_use.agent.views import ActionResult
 from browser_use.browser.views import BrowserState
-from browser_use.agent.prompts import SystemPrompt, AgentMessagePrompt
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from .custom_views import CustomAgentStepInfo
 
@@ -26,7 +24,7 @@ class CustomSystemPrompt(SystemPrompt):
        {
          "current_state": {
            "prev_action_evaluation": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Ignore the action result. The website is the ground truth. Also mention if something unexpected happened like new suggestions in an input field. Shortly state why/why not. Note that the result you output must be consistent with the reasoning you output afterwards. If you consider it to be 'Failed,' you should reflect on this during your thought.",
-           "important_contents": "Output important contents closely related to user\'s instruction or task on the current page. If there is, please output the contents. If not, please output \"None\".",
+           "important_contents": "Output important contents closely related to user\'s instruction or task on the current page. If there is, please output the contents. If not, please output empty string ''.",
            "completed_contents": "Update the input Task Progress. Completed contents is a general summary of the current contents that have been completed. Just summarize the contents that have been actually completed based on the current page and the history operations. Please list each completed item individually, such as: 1. Input username. 2. Input Password. 3. Click confirm button",
            "thought": "Think about the requirements that have been completed in previous operations and the requirements that need to be completed in the next one operation. If the output of prev_action_evaluation is 'Failed', please reflect and output your reflection here. If you think you have entered the wrong page, consider to go back to the previous page in next action.",
            "summary": "Please generate a brief natural language description for the operation in next actions based on your Thought."
@@ -93,7 +91,7 @@ class CustomSystemPrompt(SystemPrompt):
        - Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page like saving, extracting, checkboxes...
        - only use multiple actions if it makes sense. 
     """
-        text += f'   - use maximum {self.max_actions_per_step} actions per sequence'
+        text += f"   - use maximum {self.max_actions_per_step} actions per sequence"
         return text
 
     def input_format(self) -> str:
@@ -128,7 +126,7 @@ class CustomSystemPrompt(SystemPrompt):
         Returns:
             str: Formatted system prompt
         """
-        time_str = self.current_date.strftime('%Y-%m-%d %H:%M')
+        time_str = self.current_date.strftime("%Y-%m-%d %H:%M")
 
         AGENT_PROMPT = f"""You are a precise browser automation agent that interacts with websites through structured commands. Your role is to:
     1. Analyze the provided webpage elements and structure
@@ -182,22 +180,24 @@ class CustomAgentMessagePrompt:
         if self.result:
             for i, result in enumerate(self.result):
                 if result.extracted_content:
-                    state_description += (
-                        f'\nResult of action {i + 1}/{len(self.result)}: {result.extracted_content}'
-                    )
+                    state_description += f"\nResult of action {i + 1}/{len(self.result)}: {result.extracted_content}"
                 if result.error:
                     # only use last 300 characters of error
                     error = result.error[-self.max_error_length:]
-                    state_description += f'\nError of action {i + 1}/{len(self.result)}: ...{error}'
+                    state_description += (
+                        f"\nError of action {i + 1}/{len(self.result)}: ...{error}"
+                    )
 
         if self.state.screenshot:
             # Format message for vision model
             return HumanMessage(
                 content=[
-                    {'type': 'text', 'text': state_description},
+                    {"type": "text", "text": state_description},
                     {
-                        'type': 'image_url',
-                        'image_url': {'url': f'data:image/png;base64,{self.state.screenshot}'},
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{self.state.screenshot}"
+                        },
                     },
                 ]
             )

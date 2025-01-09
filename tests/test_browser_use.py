@@ -3,7 +3,6 @@
 # @Author  : wenshao
 # @ProjectName: browser-use-webui
 # @FileName: test_browser_use.py
-import pdb
 
 from dotenv import load_dotenv
 
@@ -11,11 +10,11 @@ load_dotenv()
 import sys
 
 sys.path.append(".")
+import asyncio
 import os
 import sys
 from pprint import pprint
 
-import asyncio
 from browser_use import Agent
 from browser_use.agent.views import AgentHistoryList
 
@@ -25,16 +24,16 @@ from src.utils import utils
 async def test_browser_use_org():
     from browser_use.browser.browser import Browser, BrowserConfig
     from browser_use.browser.context import (
-        BrowserContext,
         BrowserContextConfig,
         BrowserContextWindowSize,
     )
+
     llm = utils.get_llm_model(
         provider="azure_openai",
         model_name="gpt-4o",
         temperature=0.8,
         base_url=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY", "")
+        api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
     )
 
     window_w, window_h = 1920, 1080
@@ -43,16 +42,18 @@ async def test_browser_use_org():
         config=BrowserConfig(
             headless=False,
             disable_security=True,
-            extra_chromium_args=[f'--window-size={window_w},{window_h}'],
+            extra_chromium_args=[f"--window-size={window_w},{window_h}"],
         )
     )
     async with await browser.new_context(
-            config=BrowserContextConfig(
-                trace_path='./tmp/traces',
-                save_recording_path="./tmp/record_videos",
-                no_viewport=False,
-                browser_window_size=BrowserContextWindowSize(width=window_w, height=window_h),
-            )
+        config=BrowserContextConfig(
+            trace_path="./tmp/traces",
+            save_recording_path="./tmp/record_videos",
+            no_viewport=False,
+            browser_window_size=BrowserContextWindowSize(
+                width=window_w, height=window_h
+            ),
+        )
     ) as browser_context:
         agent = Agent(
             task="go to google.com and type 'OpenAI' click search and give me the first url",
@@ -61,32 +62,32 @@ async def test_browser_use_org():
         )
         history: AgentHistoryList = await agent.run(max_steps=10)
 
-        print('Final Result:')
+        print("Final Result:")
         pprint(history.final_result(), indent=4)
 
-        print('\nErrors:')
+        print("\nErrors:")
         pprint(history.errors(), indent=4)
 
         # e.g. xPaths the model clicked on
-        print('\nModel Outputs:')
+        print("\nModel Outputs:")
         pprint(history.model_actions(), indent=4)
 
-        print('\nThoughts:')
+        print("\nThoughts:")
         pprint(history.model_thoughts(), indent=4)
     # close browser
-    await browser.close()
+    await browser.close() # type: ignore
 
 
 async def test_browser_use_custom():
-    from playwright.async_api import async_playwright
     from browser_use.browser.context import BrowserContextWindowSize
+    from browser_use.browser.browser import BrowserConfig
+    from playwright.async_api import async_playwright
 
-    from src.browser.custom_browser import CustomBrowser, BrowserConfig
-    from src.browser.custom_context import BrowserContext, BrowserContextConfig
-    from src.controller.custom_controller import CustomController
     from src.agent.custom_agent import CustomAgent
     from src.agent.custom_prompts import CustomSystemPrompt
-    from src.browser.custom_context import CustomBrowserContext
+    from src.browser.custom_browser import CustomBrowser
+    from src.browser.custom_context import BrowserContextConfig
+    from src.controller.custom_controller import CustomController
 
     window_w, window_h = 1920, 1080
 
@@ -95,15 +96,15 @@ async def test_browser_use_custom():
     #     model_name="gpt-4o",
     #     temperature=0.8,
     #     base_url=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-    #     api_key=os.getenv("AZURE_OPENAI_API_KEY", "")
+    #     api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
     # )
 
-    # llm = utils.get_llm_model(
-    #     provider="gemini",
-    #     model_name="gemini-2.0-flash-exp",
-    #     temperature=1.0,
-    #     api_key=os.getenv("GOOGLE_API_KEY", "")
-    # )
+    llm = utils.get_llm_model(
+        provider="gemini",
+        model_name="gemini-2.0-flash-exp",
+        temperature=1.0,
+        api_key=os.getenv("GOOGLE_API_KEY", "")
+    )
 
     # llm = utils.get_llm_model(
     #     provider="deepseek",
@@ -111,16 +112,16 @@ async def test_browser_use_custom():
     #     temperature=0.8
     # )
 
-    llm = utils.get_llm_model(
-        provider="ollama",
-        model_name="qwen2.5:7b",
-        temperature=0.8
-    )
+    # llm = utils.get_llm_model(
+    #     provider="ollama", model_name="qwen2.5:7b", temperature=0.8
+    # )
 
     controller = CustomController()
     use_own_browser = False
     disable_security = True
-    use_vision = False
+    use_vision = True  # Set to False when using DeepSeek
+    tool_call_in_content = True  # Set to True when using Ollama
+    max_actions_per_step = 1
     playwright = None
     browser_context_ = None
     try:
@@ -134,14 +135,14 @@ async def test_browser_use_custom():
                 no_viewport=False,
                 headless=False,  # 保持浏览器窗口可见
                 user_agent=(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                    '(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
                 ),
                 java_script_enabled=True,
                 bypass_csp=disable_security,
                 ignore_https_errors=disable_security,
                 record_video_dir="./tmp/record_videos",
-                record_video_size={'width': window_w, 'height': window_h}
+                record_video_size={"width": window_w, "height": window_h},
             )
         else:
             browser_context_ = None
@@ -150,18 +151,20 @@ async def test_browser_use_custom():
             config=BrowserConfig(
                 headless=False,
                 disable_security=True,
-                extra_chromium_args=[f'--window-size={window_w},{window_h}'],
+                extra_chromium_args=[f"--window-size={window_w},{window_h}"],
             )
         )
 
         async with await browser.new_context(
-                config=BrowserContextConfig(
-                    trace_path='./tmp/result_processing',
-                    save_recording_path="./tmp/record_videos",
-                    no_viewport=False,
-                    browser_window_size=BrowserContextWindowSize(width=window_w, height=window_h),
+            config=BrowserContextConfig(
+                trace_path="./tmp/result_processing",
+                save_recording_path="./tmp/record_videos",
+                no_viewport=False,
+                browser_window_size=BrowserContextWindowSize(
+                    width=window_w, height=window_h
                 ),
-                context=browser_context_
+            ),
+            context=browser_context_, # type: ignore
         ) as browser_context:
             agent = CustomAgent(
                 task="go to google.com and type 'OpenAI' click search and give me the first url",
@@ -170,25 +173,28 @@ async def test_browser_use_custom():
                 browser_context=browser_context,
                 controller=controller,
                 system_prompt_class=CustomSystemPrompt,
-                use_vision=use_vision
+                use_vision=use_vision,
+                tool_call_in_content=tool_call_in_content,
+                max_actions_per_step=max_actions_per_step
             )
             history: AgentHistoryList = await agent.run(max_steps=10)
 
-            print('Final Result:')
+            print("Final Result:")
             pprint(history.final_result(), indent=4)
 
-            print('\nErrors:')
+            print("\nErrors:")
             pprint(history.errors(), indent=4)
 
             # e.g. xPaths the model clicked on
-            print('\nModel Outputs:')
+            print("\nModel Outputs:")
             pprint(history.model_actions(), indent=4)
 
-            print('\nThoughts:')
+            print("\nThoughts:")
             pprint(history.model_thoughts(), indent=4)
             # close browser
-    except Exception as e:
+    except Exception:
         import traceback
+
         traceback.print_exc()
     finally:
         # 显式关闭持久化上下文
@@ -233,7 +239,7 @@ async def test_browser_persistence():
                 ),
             )
         ) as context1:
-            page1 = await context1.new_page()
+            page1 = await context1.new_page() # type: ignore
             await page1.goto("https://example.com")
 
         # Second context should reuse the same browser
@@ -247,9 +253,9 @@ async def test_browser_persistence():
             )
         ) as context2:
             assert (
-                len(browser._browser.contexts) > 0
+                len(browser._browser.contexts) > 0 # type: ignore
             ), "Browser should have persisted contexts"
-            page2 = await context2.new_page()
+            page2 = await context2.new_page() # type: ignore
             await page2.goto("https://example.com")
 
     finally:
@@ -261,5 +267,4 @@ async def test_browser_persistence():
 
 if __name__ == "__main__":
     # asyncio.run(test_browser_use_org())
-    # asyncio.run(test_browser_use_custom())
-    asyncio.run(test_browser_persistence())
+    asyncio.run(test_browser_use_custom())

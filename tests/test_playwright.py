@@ -21,14 +21,14 @@ def test_connect_browser():
         browser = p.chromium.launch_persistent_context(
             user_data_dir=chrome_use_data,
             executable_path=chrome_exe,
-            headless=False  # 保持浏览器窗口可见
+            headless=False  # Keep browser window visible
         )
 
         page = browser.new_page()
         page.goto("https://mail.google.com/mail/u/0/#inbox")
         page.wait_for_load_state()
 
-        input("按下回车键以关闭浏览器...")
+        input("Press the Enter key to close the browser...")
 
         browser.close()
 

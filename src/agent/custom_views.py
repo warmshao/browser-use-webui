@@ -6,9 +6,10 @@
 
 from dataclasses import dataclass
 from typing import Type
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
-from browser_use.controller.registry.views import ActionModel
+
 from browser_use.agent.views import AgentOutput
+from browser_use.controller.registry.views import ActionModel
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 
 @dataclass
@@ -43,11 +44,16 @@ class CustomAgentOutput(AgentOutput):
     action: list[ActionModel]
 
     @staticmethod
-    def type_with_custom_actions(custom_actions: Type[ActionModel]) -> Type['CustomAgentOutput']:
+    def type_with_custom_actions(
+        custom_actions: Type[ActionModel],
+    ) -> Type["CustomAgentOutput"]:
         """Extend actions with custom actions"""
         return create_model(
-            'AgentOutput',
+            "AgentOutput",
             __base__=CustomAgentOutput,
-            action=(list[custom_actions], Field(...)),  # Properly annotated field with no default
+            action=(
+                list[custom_actions],
+                Field(...),
+            ),  # Properly annotated field with no default
             __module__=CustomAgentOutput.__module__,
         )

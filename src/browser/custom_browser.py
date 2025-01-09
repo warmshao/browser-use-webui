@@ -12,11 +12,10 @@ from .custom_context import CustomBrowserContext
 
 
 class CustomBrowser(Browser):
-
     async def new_context(
         self,
         config: BrowserContextConfig = BrowserContextConfig(),
-        context: CustomBrowserContext = None,
+        context: CustomBrowserContext = None, # type: ignore
     ) -> BrowserContext:
         """Create a browser context"""
         return CustomBrowserContext(config=config, browser=self, context=context)
