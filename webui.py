@@ -50,6 +50,7 @@ async def run_browser_agent(
         window_h,
         save_recording_path,
         save_trace_path,
+        save_screenshots_path,
         enable_recording,
         task,
         add_infos,
@@ -91,6 +92,7 @@ async def run_browser_agent(
             window_h=window_h,
             save_recording_path=save_recording_path,
             save_trace_path=save_trace_path,
+            save_screenshots_path=save_screenshots_path,
             task=task,
             max_steps=max_steps,
             use_vision=use_vision,
@@ -107,6 +109,7 @@ async def run_browser_agent(
             window_h=window_h,
             save_recording_path=save_recording_path,
             save_trace_path=save_trace_path,
+            save_screenshots_path=save_screenshots_path,
             task=task,
             add_infos=add_infos,
             max_steps=max_steps,
@@ -138,6 +141,7 @@ async def run_org_agent(
         window_h,
         save_recording_path,
         save_trace_path,
+        save_screenshots_path,
         task,
         max_steps,
         use_vision,
@@ -189,6 +193,7 @@ async def run_custom_agent(
         window_h,
         save_recording_path,
         save_trace_path,
+        save_screenshots_path,
         task,
         add_infos,
         max_steps,
@@ -260,7 +265,8 @@ async def run_custom_agent(
                 controller=controller,
                 system_prompt_class=CustomSystemPrompt,
                 max_actions_per_step=max_actions_per_step,
-                tool_call_in_content=tool_call_in_content
+                tool_call_in_content=tool_call_in_content,
+                save_screenshots_path=save_screenshots_path
             )
             history = await agent.run(max_steps=max_steps)
 
@@ -465,6 +471,14 @@ def create_ui(theme_name="Ocean"):
                         interactive=True,
                     )
 
+                    save_screenshots_path = gr.Textbox(
+                        label="Path to save screenshots",
+                        placeholder="e.g. ./tmp/screenshots",
+                        value="./tmp/screenshots",
+                        info="Path to save browser screenshots",
+                        interactive=True,
+                    )
+
             with gr.TabItem("🤖 Run Agent", id=4):
                 task = gr.Textbox(
                     label="Task Description",
@@ -561,7 +575,7 @@ def create_ui(theme_name="Ocean"):
             fn=run_browser_agent,
             inputs=[
                 agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
-                use_own_browser, headless, disable_security, window_w, window_h, save_recording_path, save_trace_path,
+                use_own_browser, headless, disable_security, window_w, window_h, save_recording_path, save_trace_path, save_screenshots_path,
                 enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content
             ],
             outputs=[final_result_output, errors_output, model_actions_output, model_thoughts_output, recording_display],
