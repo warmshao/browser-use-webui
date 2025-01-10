@@ -50,7 +50,7 @@ uv pip install -r requirements.txt
 Then install playwright:
 
 ```bash
-playwright install
+uv playwright install
 ```
 
 ### Option 2: Docker Installation
