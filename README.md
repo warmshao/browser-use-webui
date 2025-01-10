@@ -17,9 +17,13 @@ We would like to officially thank [WarmShao](https://github.com/warmshao) for hi
 
 **Custom Browser Support:** You can use your own browser with our tool, eliminating the need to re-login to sites or deal with other authentication challenges. This feature also supports high-definition screen recording.
 
-<video src="https://github.com/user-attachments/assets/56bc7080-f2e3-4367-af22-6bf2245ff6cb" controls="controls"  >Your browser does not support playing this video!</video>
+**Persistent Browser Sessions:** You can choose to keep the browser window open between AI tasks, allowing you to see the complete history and state of AI interactions.
 
-## Installation Guide
+<video src="https://github.com/user-attachments/assets/56bc7080-f2e3-4367-af22-6bf2245ff6cb" controls="controls">Your browser does not support playing this video!</video>
+
+## Installation Options
+
+### Option 1: Local Installation
 
 Read the [quickstart guide](https://docs.browser-use.com/quickstart#prepare-the-environment) or follow the steps below to get started.
 
@@ -49,84 +53,132 @@ Then install playwright:
 playwright install
 ```
 
+### Option 2: Docker Installation
+
+1. **Prerequisites:**
+   - Docker and Docker Compose installed on your system
+   - Git to clone the repository
+
+2. **Setup:**
+   ```bash
+   # Clone the repository
+   git clone https://github.com/browser-use/web-ui.git
+   cd web-ui
+
+   # Copy and configure environment variables
+   cp .env.example .env
+   # Edit .env with your preferred text editor and add your API keys
+   ```
+
+3. **Run with Docker:**
+   ```bash
+   # Build and start the container with default settings (browser closes after AI tasks)
+   docker compose up --build
+
+   # Or run with persistent browser (browser stays open between AI tasks)
+   CHROME_PERSISTENT_SESSION=true docker compose up --build
+   ```
+
+4. **Access the Application:**
+   - WebUI: `http://localhost:7788`
+   - VNC Viewer (to see browser interactions): `http://localhost:6080/vnc.html`
+   
+   Default VNC password is "vncpassword". You can change it by setting the `VNC_PASSWORD` environment variable in your `.env` file.
+
+
 ## Usage
 
-1.  **Run the WebUI:**
+### Local Setup
+1.  Copy `.env.example` to `.env` and set your environment variables, including API keys for the LLM. `cp .env.example .env`
+2.  **Run the WebUI:**
     ```bash
     python webui.py --ip 127.0.0.1 --port 7788
     ```
-2.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
-3.  **Using Your Own Browser:**
-    - Close all chrome windows
+4. WebUI options:
+   - `--ip`: The IP address to bind the WebUI to. Default is `127.0.0.1`.
+   - `--port`: The port to bind the WebUI to. Default is `7788`.
+   - `--theme`: The theme for the user interface. Default is `Ocean`.
+     - **Default**: The standard theme with a balanced design.
+     - **Soft**: A gentle, muted color scheme for a relaxed viewing experience.
+     - **Monochrome**: A grayscale theme with minimal color for simplicity and focus.
+     - **Glass**: A sleek, semi-transparent design for a modern appearance.
+     - **Origin**: A classic, retro-inspired theme for a nostalgic feel.
+     - **Citrus**: A vibrant, citrus-inspired palette with bright and fresh colors.
+     - **Ocean** (default): A blue, ocean-inspired theme providing a calming effect.
+   - `--dark-mode`: Enables dark mode for the user interface.
+3.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
+4.  **Using Your Own Browser(Optional):**
+    - Set `CHROME_PATH` to the executable path of your browser and `CHROME_USER_DATA` to the user data directory of your browser.
+      - Windows
+        ```env
+         CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
+         CHROME_USER_DATA="C:\Users\YourUsername\AppData\Local\Google\Chrome\User Data"
+        ```
+        > Note: Replace `YourUsername` with your actual Windows username for Windows systems.
+      - Mac
+        ```env
+         CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+         CHROME_USER_DATA="~/Library/Application Support/Google/Chrome/Profile 1"
+        ```
+    - Close all Chrome windows
     - Open the WebUI in a non-Chrome browser, such as Firefox or Edge. This is important because the persistent browser context will use the Chrome data when running the agent.
     - Check the "Use Own Browser" option within the Browser Settings.
+5. **Keep Browser Open(Optional):**
+    - Set `CHROME_PERSISTENT_SESSION=true` in the `.env` file.
 
-### Options:
+### Docker Setup
+1. **Environment Variables:**
+   - All configuration is done through the `.env` file
+   - Available environment variables:
+     ```
+     # LLM API Keys
+     OPENAI_API_KEY=your_key_here
+     ANTHROPIC_API_KEY=your_key_here
+     GOOGLE_API_KEY=your_key_here
 
-### `--theme`
+     # Browser Settings
+     CHROME_PERSISTENT_SESSION=true   # Set to true to keep browser open between AI tasks
+     RESOLUTION=1920x1080x24         # Custom resolution format: WIDTHxHEIGHTxDEPTH
+     RESOLUTION_WIDTH=1920           # Custom width in pixels
+     RESOLUTION_HEIGHT=1080          # Custom height in pixels
 
-- **Type**: `str`
-- **Default**: `Ocean`
-- **Description**: Specifies the theme for the user interface.
-- **Options**:
-  The available themes are defined in the `theme_map` dictionary. Below are the options you can choose from:
-  - **Default**: The standard theme with a balanced design.
-  - **Soft**: A gentle, muted color scheme for a relaxed viewing experience.
-  - **Monochrome**: A grayscale theme with minimal color for simplicity and focus.
-  - **Glass**: A sleek, semi-transparent design for a modern appearance.
-  - **Origin**: A classic, retro-inspired theme for a nostalgic feel.
-  - **Citrus**: A vibrant, citrus-inspired palette with bright and fresh colors.
-  - **Ocean** (default): A blue, ocean-inspired theme providing a calming effect.
+     # VNC Settings
+     VNC_PASSWORD=your_vnc_password  # Optional, defaults to "vncpassword"
+     ```
 
-**Example**:
+2. **Browser Persistence Modes:**
+   - **Default Mode (CHROME_PERSISTENT_SESSION=false):**
+     - Browser opens and closes with each AI task
+     - Clean state for each interaction
+     - Lower resource usage
 
-```bash
-python webui.py --ip 127.0.0.1 --port 7788 --theme Glass
-```
+   - **Persistent Mode (CHROME_PERSISTENT_SESSION=true):**
+     - Browser stays open between AI tasks
+     - Maintains history and state
+     - Allows viewing previous AI interactions
+     - Set in `.env` file or via environment variable when starting container
 
-### `--dark-mode`
+3. **Viewing Browser Interactions:**
+   - Access the noVNC viewer at `http://localhost:6080/vnc.html`
+   - Enter the VNC password (default: "vncpassword" or what you set in VNC_PASSWORD)
+   - You can now see all browser interactions in real-time
 
-- **Type**: `boolean`
-- **Default**: Disabled
-- **Description**: Enables dark mode for the user interface. This is a simple toggle; including the flag activates dark mode, while omitting it keeps the interface in light mode.
-- **Options**:
-  - **Enabled (`--dark-mode`)**: Activates dark mode, switching the interface to a dark color scheme for better visibility in low-light environments.
-  - **Disabled (default)**: Keeps the interface in the default light mode.
+4. **Container Management:**
+   ```bash
+   # Start with persistent browser
+   CHROME_PERSISTENT_SESSION=true docker compose up -d
 
-**Example**:
+   # Start with default mode (browser closes after tasks)
+   docker compose up -d
 
-```bash
-python webui.py --ip 127.0.0.1 --port 7788 --dark-mode
-```
+   # View logs
+   docker compose logs -f
 
-## (Optional) Configure Environment Variables
-
-Copy `.env.example` to `.env` and set your environment variables, including API keys for the LLM. With
-
-```bash
-cp .env.example .env
-```
-
-**If using your own browser:** - Set `CHROME_PATH` to the executable path of your browser and `CHROME_USER_DATA` to the user data directory of your browser.
-
-You can just copy examples down below to your `.env` file.
-
-### Windows
-
-```env
-CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
-CHROME_USER_DATA="C:\Users\YourUsername\AppData\Local\Google\Chrome\User Data"
-```
-
-> Note: Replace `YourUsername` with your actual Windows username for Windows systems.
-
-### Mac
-
-```env
-CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-CHROME_USER_DATA="~/Library/Application Support/Google/Chrome/Profile 1"
-```
+   # Stop the container
+   docker compose down
+   ```
 
 ## Changelog
 
-- [x] **2025/01/06:** Thanks to @richard-devbot, a New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
+- [x] **2025/01/10:** Thanks to @casistack. Now we have Docker Setup option and also Support keep browser open between tasks.[Video tutorial demo](https://github.com/browser-use/web-ui/issues/1#issuecomment-2582511750).
+- [x] **2025/01/06:** Thanks to @richard-devbot. A New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).

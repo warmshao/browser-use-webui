@@ -35,6 +35,16 @@ from src.browser.custom_context import BrowserContextConfig
 from src.controller.custom_controller import CustomController
 from src.utils import utils
 from src.utils.utils import update_model_dropdown
+from src.browser.config import BrowserPersistenceConfig
+from src.browser.custom_browser import CustomBrowser
+from src.browser.custom_context import CustomBrowserContext
+from browser_use.browser.browser import BrowserConfig
+from browser_use.browser.context import BrowserContextConfig, BrowserContextWindowSize
+
+# Global variables for persistence
+_global_browser = None
+_global_browser_context = None
+_global_playwright = None
 
 async def run_browser_agent(
         agent_type,
@@ -201,97 +211,108 @@ async def run_custom_agent(
         max_actions_per_step,
         tool_call_in_content
 ):
+    global _global_browser, _global_browser_context, _global_playwright
+    
     controller = CustomController()
-    playwright = None
-    browser_context_ = None
+    persistence_config = BrowserPersistenceConfig.from_env()
+    
     try:
+        # Initialize global browser if needed
+        if _global_browser is None:
+            _global_browser = CustomBrowser(
+                config=BrowserConfig(
+                    headless=headless,
+                    disable_security=disable_security,
+                    extra_chromium_args=[f"--window-size={window_w},{window_h}"],
+                )
+            )
+
+        # Handle browser context based on configuration
         if use_own_browser:
-            playwright = await async_playwright().start()
-            chrome_exe = os.getenv("CHROME_PATH", "")
-            chrome_use_data = os.getenv("CHROME_USER_DATA", "")
+            if _global_browser_context is None:
+                _global_playwright = await async_playwright().start()
+                chrome_exe = os.getenv("CHROME_PATH", "")
+                chrome_use_data = os.getenv("CHROME_USER_DATA", "")
 
-            if chrome_exe == "":
-                chrome_exe = None
-            elif not os.path.exists(chrome_exe):
-                raise ValueError(f"Chrome executable not found at {chrome_exe}")
-
-            if chrome_use_data == "":
-                chrome_use_data = None
-
-            browser_context_ = await playwright.chromium.launch_persistent_context(
-                user_data_dir=chrome_use_data,
-                executable_path=chrome_exe,
-                no_viewport=False,
-                headless=headless,  # 保持浏览器窗口可见
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
-                ),
-                java_script_enabled=True,
-                bypass_csp=disable_security,
-                ignore_https_errors=disable_security,
-                record_video_dir=save_recording_path if save_recording_path else None,
-                record_video_size={"width": window_w, "height": window_h},
-            )
-        else:
-            browser_context_ = None
-
-        browser = CustomBrowser(
-            config=BrowserConfig(
-                headless=headless,
-                disable_security=disable_security,
-                extra_chromium_args=[f"--window-size={window_w},{window_h}"],
-            )
-        )
-        async with await browser.new_context(
-                config=BrowserContextConfig(
-                    trace_path=save_trace_path if save_trace_path else None,
-                    save_recording_path=save_recording_path
-                    if save_recording_path
-                    else None,
+                browser_context = await _global_playwright.chromium.launch_persistent_context(
+                    user_data_dir=chrome_use_data,
+                    executable_path=chrome_exe,
                     no_viewport=False,
-                    browser_window_size=BrowserContextWindowSize(
-                        width=window_w, height=window_h
+                    headless=headless,
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
                     ),
-                ),
-                context=browser_context_,
-        ) as browser_context:
-            agent = CustomAgent(
-                task=task,
-                add_infos=add_infos,
-                use_vision=use_vision,
-                llm=llm,
-                browser_context=browser_context,
-                controller=controller,
-                system_prompt_class=CustomSystemPrompt,
-                max_actions_per_step=max_actions_per_step,
-                tool_call_in_content=tool_call_in_content,
-                save_screenshots_path=save_screenshots_path
-            )
-            history = await agent.run(max_steps=max_steps)
+                    java_script_enabled=True,
+                    bypass_csp=disable_security,
+                    ignore_https_errors=disable_security,
+                    record_video_dir=save_recording_path if save_recording_path else None,
+                    record_video_size={"width": window_w, "height": window_h},
+                )
+                _global_browser_context = await _global_browser.new_context(
+                    config=BrowserContextConfig(
+                        trace_path=save_trace_path if save_trace_path else None,
+                        save_recording_path=save_recording_path if save_recording_path else None,
+                        no_viewport=False,
+                        browser_window_size=BrowserContextWindowSize(
+                            width=window_w, height=window_h
+                        ),
+                    ),
+                    context=browser_context,
+                )
+        else:
+            if _global_browser_context is None:
+                _global_browser_context = await _global_browser.new_context(
+                    config=BrowserContextConfig(
+                        trace_path=save_trace_path if save_trace_path else None,
+                        save_recording_path=save_recording_path if save_recording_path else None,
+                        no_viewport=False,
+                        browser_window_size=BrowserContextWindowSize(
+                            width=window_w, height=window_h
+                        ),
+                    ),
+                )
 
-            final_result = history.final_result()
-            errors = history.errors()
-            model_actions = history.model_actions()
-            model_thoughts = history.model_thoughts()
+        # Create and run agent
+        agent = CustomAgent(
+            task=task,
+            add_infos=add_infos,
+            use_vision=use_vision,
+            llm=llm,
+            browser_context=_global_browser_context,
+            save_screenshots_path=save_screenshots_path,
+            controller=controller,
+            system_prompt_class=CustomSystemPrompt,
+            max_actions_per_step=max_actions_per_step,
+            tool_call_in_content=tool_call_in_content
+        )
+        history = await agent.run(max_steps=max_steps)
+
+        final_result = history.final_result()
+        errors = history.errors()
+        model_actions = history.model_actions()
+        model_thoughts = history.model_thoughts()
 
     except Exception as e:
         import traceback
-
         traceback.print_exc()
-        final_result = ""
         errors = str(e) + "\n" + traceback.format_exc()
-        model_actions = ""
-        model_thoughts = ""
+        
     finally:
-        # 显式关闭持久化上下文
-        if browser_context_:
-            await browser_context_.close()
+        # Handle cleanup based on persistence configuration
+        if not persistence_config.persistent_session:
+            if _global_browser_context:
+                await _global_browser_context.close()
+                _global_browser_context = None
 
-        # 关闭 Playwright 对象
-        if playwright:
-            await playwright.stop()
-        await browser.close()
+            if _global_playwright:
+                await _global_playwright.stop()
+                _global_playwright = None
+
+            if _global_browser:
+                await _global_browser.close()
+                _global_browser = None
+
     return final_result, errors, model_actions, model_thoughts
 
 # Define the theme map globally
@@ -386,14 +407,15 @@ def create_ui(theme_name="Ocean"):
             with gr.TabItem("🔧 LLM Configuration", id=2):
                 with gr.Group():
                     llm_provider = gr.Dropdown(
-                        ["anthropic", "openai", "deepseek", "gemini", "ollama", "azure_openai"],
+                        choices=[provider for provider,model in utils.model_names.items()],
                         label="LLM Provider",
-                        value="",
+                        value="openai",
                         info="Select your preferred language model provider"
                     )
                     llm_model_name = gr.Dropdown(
                         label="Model Name",
-                        value="",
+                        choices=utils.model_names['openai'],
+                        value="gpt-4o",
                         interactive=True,
                         allow_custom_value=True,  # Allow users to input custom model names
                         info="Select a model from the dropdown or type a custom model name"

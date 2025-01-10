@@ -12,7 +12,9 @@ import os
 from browser_use.browser.browser import Browser
 from browser_use.browser.context import BrowserContext, BrowserContextConfig
 from playwright.async_api import Browser as PlaywrightBrowser
+from playwright.async_api import BrowserContext as PlaywrightBrowserContext
 
+from .config import BrowserPersistenceConfig
 logger = logging.getLogger(__name__)
 
 
@@ -21,18 +23,21 @@ class CustomBrowserContext(BrowserContext):
         self,
         browser: "Browser",
         config: BrowserContextConfig = BrowserContextConfig(),
-        context: BrowserContext = None,
+        context: PlaywrightBrowserContext = None,
     ):
         super(CustomBrowserContext, self).__init__(browser=browser, config=config)
         self.context = context
+        self._persistence_config = BrowserPersistenceConfig.from_env()
 
-    async def _create_context(self, browser: PlaywrightBrowser):
+    async def _create_context(self, browser: PlaywrightBrowser) -> PlaywrightBrowserContext:
         """Creates a new browser context with anti-detection measures and loads cookies if available."""
         # If we have a context, return it directly
         if self.context:
             return self.context
-        if self.browser.config.chrome_instance_path and len(browser.contexts) > 0:
-            # Connect to existing Chrome instance instead of creating new one
+
+        # Check if we should use existing context for persistence
+        if self._persistence_config.persistent_session and len(browser.contexts) > 0:
+            logger.info("Using existing persistent context")
             context = browser.contexts[0]
         else:
             # Original code for creating new context
@@ -47,7 +52,7 @@ class CustomBrowserContext(BrowserContext):
                 bypass_csp=self.config.disable_security,
                 ignore_https_errors=self.config.disable_security,
                 record_video_dir=self.config.save_recording_path,
-                record_video_size=self.config.browser_window_size,  # set record video size, same as windows size
+                record_video_size=self.config.browser_window_size,
             )
 
         if self.config.trace_path:
@@ -94,3 +99,8 @@ class CustomBrowserContext(BrowserContext):
         )
 
         return context
+
+    async def close(self):
+        """Override close to respect persistence setting"""
+        if not self._persistence_config.persistent_session:
+            await super().close()
