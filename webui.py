@@ -50,6 +50,7 @@ async def run_browser_agent(
         window_w,
         window_h,
         save_recording_path,
+        save_trace_path,
         enable_recording,
         task,
         add_infos,
@@ -102,6 +103,7 @@ async def run_browser_agent(
             window_w=window_w,
             window_h=window_h,
             save_recording_path=save_recording_path,
+            save_trace_path=save_trace_path,
             task=task,
             max_steps=max_steps,
             use_vision=use_vision,
@@ -117,6 +119,7 @@ async def run_browser_agent(
             window_w=window_w,
             window_h=window_h,
             save_recording_path=save_recording_path,
+            save_trace_path=save_trace_path,
             task=task,
             add_infos=add_infos,
             max_steps=max_steps,
@@ -148,6 +151,7 @@ async def run_org_agent(
         window_w,
         window_h,
         save_recording_path,
+        save_trace_path,
         task,
         max_steps,
         use_vision,
@@ -164,7 +168,7 @@ async def run_org_agent(
     )
     async with await browser.new_context(
             config=BrowserContextConfig(
-                trace_path="./tmp/traces",
+                trace_path=save_trace_path if save_trace_path else None,
                 save_recording_path=save_recording_path if save_recording_path else None,
                 no_viewport=False,
                 browser_window_size=BrowserContextWindowSize(
@@ -198,6 +202,7 @@ async def run_custom_agent(
         window_w,
         window_h,
         save_recording_path,
+        save_trace_path,
         task,
         add_infos,
         max_steps,
@@ -223,7 +228,7 @@ async def run_custom_agent(
             if chrome_use_data == "":
                 chrome_use_data = None
 
-            # 配置代理
+            # Configure launch arguments with proxy support
             launch_args = {
                 "user_data_dir": chrome_use_data,
                 "executable_path": chrome_exe,
@@ -240,7 +245,7 @@ async def run_custom_agent(
                 "record_video_size": {"width": window_w, "height": window_h},
             }
 
-            # 如果启用代理，添加代理配置
+            # Add proxy configuration if enabled
             if use_proxy:
                 proxy_url = os.getenv("PROXY_URL", "")
                 if proxy_url:
@@ -261,7 +266,7 @@ async def run_custom_agent(
         )
         async with await browser.new_context(
                 config=BrowserContextConfig(
-                    trace_path="./tmp/result_processing",
+                    trace_path=save_trace_path if save_trace_path else None,
                     save_recording_path=save_recording_path
                     if save_recording_path
                     else None,
@@ -272,7 +277,7 @@ async def run_custom_agent(
                 ),
                 context=browser_context_,
         ) as browser_context:
-            # 创建消息管理器
+            # Create message manager instance
             message_manager = CustomMassageManager(
                 llm=llm,
                 task=task,
@@ -291,7 +296,7 @@ async def run_custom_agent(
                 controller=controller,
                 system_prompt_class=CustomSystemPrompt,
                 max_actions_per_step=max_actions_per_step,
-                message_manager=message_manager  # 传入创建好的消息管理器
+                message_manager=message_manager
             )
             history = await agent.run(max_steps=max_steps)
 
@@ -309,11 +314,11 @@ async def run_custom_agent(
         model_actions = ""
         model_thoughts = ""
     finally:
-        # 显式关闭持久化上下文
+        # Explicitly close the persistent context
         if browser_context_:
             await browser_context_.close()
 
-        # 关闭 Playwright 对象
+        # Close the Playwright instance
         if playwright:
             await playwright.stop()
         await browser.close()
@@ -448,7 +453,7 @@ def create_ui(theme_name="Ocean"):
                     use_proxy = gr.Checkbox(
                         label="Use Proxy",
                         value=os.getenv("USE_PROXY", "false").lower() == "true",
-                        info="Enable proxy for API requests (proxy URL is configured in .env file)"
+                        info="Enable proxy for API requests and browser (proxy URL is configured in .env file)"
                     )
 
             with gr.TabItem("🌐 Browser Settings", id=3):
@@ -493,6 +498,14 @@ def create_ui(theme_name="Ocean"):
                         value="./tmp/record_videos",
                         info="Path to save browser recordings",
                         interactive=True,  # Allow editing only if recording is enabled
+                    )
+
+                    save_trace_path = gr.Textbox(
+                        label="Trace Path",
+                        placeholder="e.g. ./tmp/traces",
+                        value="./tmp/traces",
+                        info="Path to save Agent traces",
+                        interactive=True,
                     )
 
             with gr.TabItem("🤖 Run Agent", id=4):
@@ -591,7 +604,7 @@ def create_ui(theme_name="Ocean"):
             fn=run_browser_agent,
             inputs=[
                 agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
-                use_own_browser, headless, disable_security, window_w, window_h, save_recording_path,
+                use_own_browser, headless, disable_security, window_w, window_h, save_recording_path, save_trace_path,
                 enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content,
                 use_proxy
             ],

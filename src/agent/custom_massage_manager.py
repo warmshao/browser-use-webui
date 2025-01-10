@@ -59,12 +59,14 @@ class CustomMassageManager(MessageManager):
         self._add_message_with_tokens(self.system_prompt)
         tool_calls = [
             {
-                'name': 'AgentOutput',
+                'name': 'CustomAgentOutput',
                 'args': {
                     'current_state': {
-                        'evaluation_previous_goal': 'Unknown - No previous actions to evaluate.',
-                        'memory': '',
-                        'next_goal': 'Obtain task from user',
+                        'prev_action_evaluation': 'Unknown - No previous actions to evaluate.',
+                        'important_contents': '',
+                        'completed_contents': '',
+                        'thought': 'Now Google is open. Need to type OpenAI to search.',
+                        'summary': 'Type OpenAI to search.',
                     },
                     'action': [],
                 },
