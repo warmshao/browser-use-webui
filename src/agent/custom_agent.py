@@ -6,8 +6,11 @@
 
 import json
 import logging
+import os
 import pdb
 import traceback
+import src.utils.utils as utils
+from datetime import datetime
 from typing import Optional, Type
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -211,6 +214,25 @@ class CustomAgent(Agent):
 
             if len(result) > 0 and result[-1].is_done:
                 logger.info(f"📄 Result: {result[-1].extracted_content}")
+
+            # Persist the result
+            data_dir = os.getenv("DATA_DIRECTORY", "")
+            try:
+                if data_dir != "":
+                    task_name = utils.sanitize_directory_name(self.task)
+                    os.makedirs(data_dir, exist_ok=True)
+                    task_dir = os.path.join(data_dir, task_name, )
+                    os.makedirs(task_dir, exist_ok=True)
+                    file_name = f"step_{step_info.step_number}.txt"
+                    file_path = os.path.join(task_dir, file_name, )
+
+                    with open(file_path, "a", encoding='utf-8') as file:
+                        file.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Content of the step #{step_info.step_number} is:\n{result[-1].extracted_content}.\n")
+                        file.write("--------------------------------------------------------\n")
+                    logger.info(f"📄 Saved in: {file_path}")
+
+            except Exception as E:
+                pass
 
             self.consecutive_failures = 0
 
