@@ -131,7 +131,9 @@ playwright install
 
     - Set `CHROME_PERSISTENT_SESSION=true` in the `.env` file.
 
-7.  **Save Outputs in a Directory (Optional):** - By setting `DATA_DIRECTORY` in the `.env` file, you can now save the outputs of each step regarding the task. Below is an example structure of the output by setting `DATA_DIRECTORY="C:/YOUR/PATH/TO/HERE/data"`
+7.  **Save Outputs in a Directory (Optional):**
+
+    By setting `DATA_DIRECTORY` in the `.env` file, you can save the outputs of each step based on the task description. Below is an example structure of the output by setting `DATA_DIRECTORY="C:/YOUR/PATH/TO/HERE/data"`
 
     ```mermaid
     data
