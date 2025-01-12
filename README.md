@@ -56,10 +56,12 @@ playwright install
 ### Option 2: Docker Installation
 
 1. **Prerequisites:**
+
    - Docker and Docker Compose installed on your system
    - Git to clone the repository
 
 2. **Setup:**
+
    ```bash
    # Clone the repository
    git clone https://github.com/browser-use/web-ui.git
@@ -71,6 +73,7 @@ playwright install
    ```
 
 3. **Run with Docker:**
+
    ```bash
    # Build and start the container with default settings (browser closes after AI tasks)
    docker compose up --build
@@ -80,34 +83,35 @@ playwright install
    ```
 
 4. **Access the Application:**
+
    - WebUI: `http://localhost:7788`
    - VNC Viewer (to see browser interactions): `http://localhost:6080/vnc.html`
-   
-   Default VNC password is "vncpassword". You can change it by setting the `VNC_PASSWORD` environment variable in your `.env` file.
 
+   Default VNC password is "vncpassword". You can change it by setting the `VNC_PASSWORD` environment variable in your `.env` file.
 
 ## Usage
 
 ### Local Setup
+
 1.  Copy `.env.example` to `.env` and set your environment variables, including API keys for the LLM. `cp .env.example .env`
 2.  **Run the WebUI:**
     ```bash
     python webui.py --ip 127.0.0.1 --port 7788
     ```
-4. WebUI options:
-   - `--ip`: The IP address to bind the WebUI to. Default is `127.0.0.1`.
-   - `--port`: The port to bind the WebUI to. Default is `7788`.
-   - `--theme`: The theme for the user interface. Default is `Ocean`.
-     - **Default**: The standard theme with a balanced design.
-     - **Soft**: A gentle, muted color scheme for a relaxed viewing experience.
-     - **Monochrome**: A grayscale theme with minimal color for simplicity and focus.
-     - **Glass**: A sleek, semi-transparent design for a modern appearance.
-     - **Origin**: A classic, retro-inspired theme for a nostalgic feel.
-     - **Citrus**: A vibrant, citrus-inspired palette with bright and fresh colors.
-     - **Ocean** (default): A blue, ocean-inspired theme providing a calming effect.
-   - `--dark-mode`: Enables dark mode for the user interface.
-3.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
-4.  **Using Your Own Browser(Optional):**
+3.  WebUI options:
+    - `--ip`: The IP address to bind the WebUI to. Default is `127.0.0.1`.
+    - `--port`: The port to bind the WebUI to. Default is `7788`.
+    - `--theme`: The theme for the user interface. Default is `Ocean`.
+      - **Default**: The standard theme with a balanced design.
+      - **Soft**: A gentle, muted color scheme for a relaxed viewing experience.
+      - **Monochrome**: A grayscale theme with minimal color for simplicity and focus.
+      - **Glass**: A sleek, semi-transparent design for a modern appearance.
+      - **Origin**: A classic, retro-inspired theme for a nostalgic feel.
+      - **Citrus**: A vibrant, citrus-inspired palette with bright and fresh colors.
+      - **Ocean** (default): A blue, ocean-inspired theme providing a calming effect.
+    - `--dark-mode`: Enables dark mode for the user interface.
+4.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
+5.  **Using Your Own Browser (Optional):**
     - Set `CHROME_PATH` to the executable path of your browser and `CHROME_USER_DATA` to the user data directory of your browser.
       - Windows
         ```env
@@ -123,13 +127,32 @@ playwright install
     - Close all Chrome windows
     - Open the WebUI in a non-Chrome browser, such as Firefox or Edge. This is important because the persistent browser context will use the Chrome data when running the agent.
     - Check the "Use Own Browser" option within the Browser Settings.
-5. **Keep Browser Open(Optional):**
+6.  **Keep Browser Open (Optional):**
+
     - Set `CHROME_PERSISTENT_SESSION=true` in the `.env` file.
 
+7.  **Save Outputs in a Directory (Optional):** - By setting `DATA_DIRECTORY` in the `.env` file, you can now save the outputs of each step regarding the task. Below is an example structure of the output by setting `DATA_DIRECTORY="C:/YOUR/PATH/TO/HERE/data"`
+
+    ```mermaid
+    data
+    ├── <Description of Task 1>
+    │            └──────── step_<ID1>.txt
+    │            └──────── step_<ID2>.txt
+    │            └──────── etc...
+    └── <Description of Task 2>
+    │            ├── step_<ID1>.txt
+    │            └── step_<ID2>.txt
+    │            └──────── etc...
+    └── etc...
+    ```
+
 ### Docker Setup
+
 1. **Environment Variables:**
+
    - All configuration is done through the `.env` file
    - Available environment variables:
+
      ```
      # LLM API Keys
      OPENAI_API_KEY=your_key_here
@@ -147,7 +170,9 @@ playwright install
      ```
 
 2. **Browser Persistence Modes:**
+
    - **Default Mode (CHROME_PERSISTENT_SESSION=false):**
+
      - Browser opens and closes with each AI task
      - Clean state for each interaction
      - Lower resource usage
@@ -159,11 +184,13 @@ playwright install
      - Set in `.env` file or via environment variable when starting container
 
 3. **Viewing Browser Interactions:**
+
    - Access the noVNC viewer at `http://localhost:6080/vnc.html`
    - Enter the VNC password (default: "vncpassword" or what you set in VNC_PASSWORD)
    - You can now see all browser interactions in real-time
 
 4. **Container Management:**
+
    ```bash
    # Start with persistent browser
    CHROME_PERSISTENT_SESSION=true docker compose up -d
