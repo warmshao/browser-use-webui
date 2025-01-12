@@ -143,6 +143,9 @@ def encode_image(img_path):
     return image_data
 
 def sanitize_directory_name(name):
+    """
+    Sanitize a directory name by replacing invalid characters and handling reserved names.
+    """
     # Replace invalid characters and handle reserved names
     reserved_names = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
     name = re.sub(r'[<>:"/\\|?*]', '_', name)  # Replace invalid characters
