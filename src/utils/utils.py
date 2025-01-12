@@ -7,6 +7,7 @@
 
 import base64
 import os
+import re
 
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -140,3 +141,13 @@ def encode_image(img_path):
     with open(img_path, "rb") as fin:
         image_data = base64.b64encode(fin.read()).decode("utf-8")
     return image_data
+
+def sanitize_directory_name(name):
+    # Replace invalid characters and handle reserved names
+    reserved_names = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
+    name = re.sub(r'[<>:"/\\|?*]', '_', name)  # Replace invalid characters
+    name = name.strip().strip(".")            # Remove leading/trailing spaces and periods
+    if name.upper() in reserved_names:
+        name += "_safe"
+    MIN_LENGTH_OF_DIRECTORY = min(len(name), 254)
+    return name[:MIN_LENGTH_OF_DIRECTORY]  # Ensure the name is within length limits
