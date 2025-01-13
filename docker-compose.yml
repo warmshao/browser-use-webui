@@ -1,5 +1,6 @@
 services:
   browser-use-webui:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
