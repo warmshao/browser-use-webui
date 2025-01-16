@@ -18,15 +18,16 @@ class TestPluginSystem(unittest.TestCase):
         self.plugins_dir = os.path.join(self.test_dir, "plugins")
         os.makedirs(self.plugins_dir)
         
-        # Create config file
+        # Create config file with proper security settings
         self.config_path = os.path.join(self.plugins_dir, "config.yaml")
         with open(self.config_path, 'w') as f:
             yaml.dump({
                 "enabled_plugins": [],
                 "plugin_config": {},
                 "security": {
-                    "allow_network_access": True,
+                    "allow_network_access": True,  # Explicitly allow network access
                     "allow_file_access": True,
+                    "allow_system_access": True,
                     "sanitize_all_inputs": True
                 }
             }, f)
@@ -41,6 +42,12 @@ class TestPluginSystem(unittest.TestCase):
             f.write(plugin_content)
             
         # Create manifest file
+        manifest_data['config'] = manifest_data.get('config', {})
+        manifest_data['config']['security'] = {  # Add security config to manifest
+            'allow_network_access': True,
+            'allow_file_access': True,
+            'allow_system_access': True
+        }
         with open(os.path.join(plugin_dir, "manifest.yaml"), 'w') as f:
             yaml.dump(manifest_data, f)
             
@@ -202,7 +209,8 @@ class TestPlugin(PluginBase):
     def create_ui(self, main_tabs: gr.Tabs) -> None:
         pass
         
-    def _sanitize_test_input(self, text: str) -> str:
+    def sanitize_test_input(self, text: str) -> str:
+        """Public method for testing input sanitization."""
         return self._sanitize_input(text)
 '''
         self.create_test_plugin("test_security", manifest, plugin_content)
@@ -217,7 +225,7 @@ class TestPlugin(PluginBase):
             
             # Test input sanitization
             test_input = '<script>alert("xss")</script>Hello'
-            sanitized = plugin._sanitize_test_input(test_input)
+            sanitized = plugin.sanitize_test_input(test_input)
             self.assertNotIn('<script>', sanitized)
             self.assertIn('Hello', sanitized)
     
@@ -256,6 +264,63 @@ class TestPlugin(PluginBase):
             is_compatible, reason = plugin.validate_compatibility("1.0.0")
             self.assertFalse(is_compatible)
             self.assertIn("minimum version", reason)
+    
+    def test_plugin_state_management(self):
+        """Test plugin state file management."""
+        manifest = {
+            "name": "State Test Plugin",
+            "version": "1.0.0",
+            "description": "Testing state management",
+            "min_webui_version": "1.0.0",
+            "config": {"enabled": True}
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_state", manifest, plugin_content)
+        
+        # Create plugin instance
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_state")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:
+            # Test state file location
+            state_file = plugin._get_state_file_path()
+            self.assertTrue(state_file.endswith("state_test_plugin_state.json"))
+            self.assertTrue(state_file.startswith(plugin.STATE_DIR))
+            
+            # Test state persistence
+            test_state = {"test_key": "test_value"}
+            plugin.state = test_state
+            plugin._save_state()
+            
+            # Verify file exists
+            self.assertTrue(os.path.exists(state_file))
+            
+            # Create new instance and verify state loads
+            plugin2 = PluginFactory.create_plugin(self.plugins_dir, "test_state")
+            self.assertIsNotNone(plugin2)
+            if plugin2:
+                self.assertEqual(plugin2.state.get("test_key"), "test_value")
+                
+            # Test state file cleanup
+            os.remove(state_file)
+            plugin3 = PluginFactory.create_plugin(self.plugins_dir, "test_state")
+            self.assertIsNotNone(plugin3)
+            if plugin3:
+                self.assertEqual(plugin3.state, {})  # Empty state for new instance
 
 if __name__ == '__main__':
     unittest.main() 

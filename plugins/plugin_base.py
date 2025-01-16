@@ -14,8 +14,11 @@ logger = logging.getLogger(__name__)
 class PluginBase(ABC):
     """Abstract base class for all plugins."""
     
+    # Class-level constant for state directory
+    STATE_DIR = "plugins/state"
+    
     def __init__(self, manifest: Optional[Dict[str, Any]] = None):
-        """Initialize plugin with optional manifest injection."""
+        """Initialize plugin with manifest injection from factory."""
         # Initialize base attributes with defaults
         self._init_base_attributes()
         
@@ -23,13 +26,16 @@ class PluginBase(ABC):
         if self.__class__ == PluginBase:
             return
             
-        # Apply manifest if provided
+        # Apply manifest if provided by factory
         if manifest:
             self.manifest = manifest
             self._init_attributes_from_manifest()
         else:
-            logger.error(f"No manifest provided for plugin {self.__class__.__name__}")
-            return
+            logger.error(f"No manifest provided for plugin {self.__class__.__name__}. Plugins must be created through PluginFactory.")
+            raise ValueError("Manifest is required. Use PluginFactory to create plugins.")
+            
+        # Ensure state directory exists
+        os.makedirs(self.STATE_DIR, exist_ok=True)
     
     def _init_base_attributes(self) -> None:
         """Initialize base attributes with defaults."""
@@ -67,22 +73,36 @@ class PluginBase(ABC):
         self.state = {}
         self._load_state()
     
+    def _get_state_file_path(self) -> str:
+        """Get the path to the state file for this plugin."""
+        if not self.name:
+            raise ValueError("Plugin name not set. Cannot determine state file path.")
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', self.name.lower())
+        return os.path.join(self.STATE_DIR, f"{safe_name}_state.json")
+    
     def _load_state(self) -> None:
-        """Load persisted plugin state"""
-        state_file = os.path.join(os.path.dirname(self.__class__.__module__), "state.json")
-        if os.path.exists(state_file):
-            try:
+        """Load persisted plugin state from dedicated state directory"""
+        try:
+            state_file = self._get_state_file_path()
+            if os.path.exists(state_file):
                 with open(state_file, 'r') as f:
                     self.state = json.load(f)
-            except Exception as e:
-                logger.error(f"Failed to load state for {self.name}: {str(e)}")
+                logger.debug(f"Loaded state for plugin {self.name} from {state_file}")
+            else:
+                logger.debug(f"No existing state file found for plugin {self.name}")
+                self.state = {}
+        except Exception as e:
+            logger.error(f"Failed to load state for {self.name}: {str(e)}")
+            self.state = {}
     
     def _save_state(self) -> None:
-        """Persist plugin state"""
-        state_file = os.path.join(os.path.dirname(self.__class__.__module__), "state.json")
+        """Persist plugin state to dedicated state directory"""
         try:
+            state_file = self._get_state_file_path()
+            os.makedirs(os.path.dirname(state_file), exist_ok=True)
             with open(state_file, 'w') as f:
-                json.dump(self.state, f)
+                json.dump(self.state, f, indent=2)
+            logger.debug(f"Saved state for plugin {self.name} to {state_file}")
         except Exception as e:
             logger.error(f"Failed to save state for {self.name}: {str(e)}")
     
