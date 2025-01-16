@@ -7,6 +7,11 @@ license: MIT
 
 config:
   enabled: true
+  auto_install_deps: true
+
+dependencies:
+  - package: "gradio>=3.50.0"
+  - package: "pyyaml>=6.0.1"
 
 security:
   sanitize_all_inputs: true 

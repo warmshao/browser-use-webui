@@ -2,7 +2,8 @@ import os
 import yaml
 import logging
 import importlib.util
-from typing import Dict, Any, Optional, Type, Tuple
+import subprocess
+from typing import Dict, Any, Optional, Type, Tuple, List
 from .plugin_base import PluginBase
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,12 @@ class PluginFactory:
             if not manifest:
                 return None
             
+            # Install dependencies if enabled
+            if manifest.get('config', {}).get('auto_install_deps', False):
+                if not cls._install_dependencies(manifest.get('dependencies', [])):
+                    logger.error(f"Failed to install dependencies for plugin {plugin_name}")
+                    return None
+            
             # Load plugin class
             plugin_class = cls._load_plugin_class(plugin_dir, plugin_name)
             if not plugin_class:
@@ -30,6 +37,37 @@ class PluginFactory:
         except Exception as e:
             logger.error(f"Failed to create plugin {plugin_name}: {str(e)}")
             return None
+    
+    @classmethod
+    def _install_dependencies(cls, dependencies: List[Dict[str, str]]) -> bool:
+        """Install plugin dependencies using pip."""
+        try:
+            if not dependencies:
+                return True
+                
+            logger.info("Installing plugin dependencies...")
+            for dep in dependencies:
+                package = dep.get('package')
+                if not package:
+                    continue
+                    
+                logger.info(f"Installing {package}")
+                result = subprocess.run(
+                    ['pip', 'install', package],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode != 0:
+                    logger.error(f"Failed to install {package}: {result.stderr}")
+                    return False
+                    
+            logger.info("Successfully installed all dependencies")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error installing dependencies: {str(e)}")
+            return False
     
     @classmethod
     def _load_manifest(cls, plugin_dir: str, plugin_name: str) -> Optional[Dict[str, Any]]:
