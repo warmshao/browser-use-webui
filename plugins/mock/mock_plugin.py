@@ -45,6 +45,26 @@ class MockPlugin(PluginBase):
                     gr.Markdown(f"## {self.name} v{self.version}")
                     gr.Markdown(f"_{self.description}_")
                     
+                    # Add enable/disable buttons
+                    with gr.Row():
+                        enable_btn = gr.Button("Enable Plugin", variant="primary")
+                        disable_btn = gr.Button("Disable Plugin", variant="stop")
+                        status_text = gr.Textbox(label="Plugin Status", value="", interactive=False)
+                    
+                    def update_status():
+                        return "Enabled" if self.is_enabled() else "Disabled"
+                    
+                    def enable_plugin():
+                        self.on_enable()
+                        return update_status()
+                        
+                    def disable_plugin():
+                        self.on_disable()
+                        return update_status()
+                    
+                    enable_btn.click(fn=enable_plugin, outputs=status_text)
+                    disable_btn.click(fn=disable_plugin, outputs=status_text)
+                    
                     with gr.Row():
                         text_input = gr.Textbox(
                             label="Input Text",
@@ -56,6 +76,8 @@ class MockPlugin(PluginBase):
                         )
                     
                     def process_text(text: str) -> str:
+                        if not self.is_enabled():
+                            return "Plugin is disabled. Please enable it first."
                         # Sanitize input
                         text = self._sanitize_input(text)
                         # Store last processed text in state
@@ -73,12 +95,13 @@ class MockPlugin(PluginBase):
                     with gr.Row():
                         gr.Markdown("### Plugin State")
                         state_text = gr.Markdown(
-                            f"""
+                            value=lambda: f"""
                             - Last Initialized: {self.get_state('last_init', 'Never')}
                             - Last Enabled: {self.get_state('last_enabled', 'Never')}
                             - Last Disabled: {self.get_state('last_disabled', 'Never')}
                             - Last Processed Text: {self.get_state('last_processed', 'None')}
-                            """
+                            """,
+                            every=1  # Update every second
                         )
                     
         except Exception as e:
