@@ -3,6 +3,7 @@ import yaml
 import logging
 import importlib.util
 import subprocess
+import pkg_resources
 from typing import Dict, Any, Optional, Type, Tuple, List
 from .plugin_base import PluginBase
 
@@ -45,12 +46,37 @@ class PluginFactory:
             if not dependencies:
                 return True
                 
-            logger.info("Installing plugin dependencies...")
+            logger.info("Checking plugin dependencies...")
             for dep in dependencies:
                 package = dep.get('package')
                 if not package:
                     continue
-                    
+                
+                # Parse package name and version constraint
+                if '>=' in package:
+                    pkg_name, version_required = package.split('>=')
+                    pkg_name = pkg_name.strip()
+                    version_required = version_required.strip()
+                else:
+                    pkg_name = package.strip()
+                    version_required = None
+                
+                try:
+                    # Check if package is already installed
+                    pkg = pkg_resources.get_distribution(pkg_name)
+                    if version_required:
+                        if pkg.version >= version_required:
+                            logger.info(f"Package {pkg_name} {pkg.version} already satisfies requirement {package}")
+                            continue
+                        else:
+                            logger.info(f"Updating {pkg_name} {pkg.version} to {version_required}")
+                    else:
+                        logger.info(f"Package {pkg_name} {pkg.version} already installed")
+                        continue
+                except pkg_resources.DistributionNotFound:
+                    logger.info(f"Package {pkg_name} not found, installing...")
+                
+                # Install or upgrade package
                 logger.info(f"Installing {package}")
                 result = subprocess.run(
                     ['pip', 'install', package],
@@ -62,11 +88,11 @@ class PluginFactory:
                     logger.error(f"Failed to install {package}: {result.stderr}")
                     return False
                     
-            logger.info("Successfully installed all dependencies")
+            logger.info("All dependencies are satisfied")
             return True
             
         except Exception as e:
-            logger.error(f"Error installing dependencies: {str(e)}")
+            logger.error(f"Error managing dependencies: {str(e)}")
             return False
     
     @classmethod
