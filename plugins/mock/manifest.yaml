@@ -10,8 +10,10 @@ config:
   auto_install_deps: true
 
 dependencies:
-  - package: "gradio>=3.50.0"
-  - package: "pyyaml>=6.0.1"
+  - package: "gradio>=5.12.0"
+  - package: "numpy>=2.2.1"
+  - package: "pandas>=2.2.3"
+  - package: "requests>=2.32.3"
 
 security:
   sanitize_all_inputs: true 
