@@ -3,6 +3,7 @@ import os
 import tempfile
 import shutil
 import yaml
+import subprocess
 from typing import Dict, Any
 from datetime import datetime
 from plugins import load_plugins, PluginBase, plugin_manager, PluginFactory
@@ -62,6 +63,19 @@ class TestPluginSystem(unittest.TestCase):
         with open(self.config_path, 'w') as f:
             yaml.dump(config, f)
     
+    def _get_package_version(self, package: str) -> str:
+        """Helper to get package version."""
+        result = subprocess.run(
+            ['pip', 'show', package],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if line.startswith('Version: '):
+                    return line.split('Version: ')[1].strip()
+        return "0.0.0"  # Return minimal version if not found
+
     def test_factory_create_plugin(self):
         """Test plugin creation using factory."""
         manifest_data = {
@@ -321,6 +335,170 @@ class TestPlugin(PluginBase):
             self.assertIsNotNone(plugin3)
             if plugin3:
                 self.assertEqual(plugin3.state, {})  # Empty state for new instance
+
+    def test_dependency_management(self):
+        """Test plugin dependency management."""
+        manifest = {
+            "name": "Dependency Plugin",
+            "version": "1.0.0",
+            "description": "Testing dependencies",
+            "min_webui_version": "1.0.0",
+            "config": {
+                "enabled": True,
+                "auto_install_deps": True
+            },
+            "dependencies": [
+                {"package": "gradio>=3.50.0"},
+                {"package": "pyyaml>=6.0.1"}
+            ]
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_deps", manifest, plugin_content)
+        
+        # Test dependency installation
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_deps")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        
+        # Verify gradio is installed with correct version
+        gradio_version = self._get_package_version("gradio")
+        self.assertTrue(PluginFactory._check_version(gradio_version, "3.50.0"))
+        
+        # Verify pyyaml is installed with correct version
+        yaml_version = self._get_package_version("pyyaml")
+        self.assertTrue(PluginFactory._check_version(yaml_version, "6.0.1"))
+        
+    def test_dependency_skip_when_satisfied(self):
+        """Test that dependencies aren't reinstalled if already satisfied."""
+        current_gradio = self._get_package_version("gradio")
+        manifest = {
+            "name": "Skip Deps Plugin",
+            "version": "1.0.0",
+            "description": "Testing dependency skipping",
+            "min_webui_version": "1.0.0",
+            "config": {
+                "enabled": True,
+                "auto_install_deps": True
+            },
+            "dependencies": [
+                {"package": f"gradio>={current_gradio}"}
+            ]
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_skip_deps", manifest, plugin_content)
+        
+        # Test dependency skipping
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_skip_deps")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        
+    def test_dependency_disabled(self):
+        """Test that dependencies aren't installed when auto_install_deps is disabled."""
+        manifest = {
+            "name": "No Deps Plugin",
+            "version": "1.0.0",
+            "description": "Testing disabled dependencies",
+            "min_webui_version": "1.0.0",
+            "config": {
+                "enabled": True,
+                "auto_install_deps": False
+            },
+            "dependencies": [
+                {"package": "nonexistent-package>=1.0.0"}
+            ]
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_no_deps", manifest, plugin_content)
+        
+        # Test dependency installation is skipped
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_no_deps")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        
+        # Verify nonexistent package wasn't installed
+        result = subprocess.run(['pip', 'show', 'nonexistent-package'], capture_output=True)
+        self.assertNotEqual(result.returncode, 0, "Package should not be installed")
+
+    def test_invalid_dependency_format(self):
+        """Test handling of invalid dependency specifications."""
+        manifest = {
+            "name": "Invalid Deps Plugin",
+            "version": "1.0.0",
+            "description": "Testing invalid dependencies",
+            "min_webui_version": "1.0.0",
+            "config": {
+                "enabled": True,
+                "auto_install_deps": True
+            },
+            "dependencies": [
+                {"wrong_key": "gradio>=3.50.0"},
+                {},  # Empty dependency
+                {"package": ""}  # Empty package name
+            ]
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_invalid_deps", manifest, plugin_content)
+        
+        # Test invalid dependencies are handled gracefully
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_invalid_deps")
+        self.assertIsNotNone(plugin, "Plugin should be created despite invalid dependencies")
 
 if __name__ == '__main__':
     unittest.main() 
