@@ -1,0 +1,12 @@
+name: Mock Plugin
+version: 1.0.0
+description: A mock plugin for testing and demonstration
+min_webui_version: 1.0.0
+author: Demo Author
+license: MIT
+
+config:
+  enabled: true
+
+security:
+  sanitize_all_inputs: true 

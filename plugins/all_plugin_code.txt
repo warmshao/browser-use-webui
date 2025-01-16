@@ -1,0 +1,1047 @@
+
+# File: plugins/__init__.py
+```python
+import os
+import yaml
+import logging
+from typing import List, Dict, Any, Optional, Tuple
+from .plugin_base import PluginBase
+from .factory import PluginFactory
+
+logger = logging.getLogger(__name__)
+
+class PluginManager:
+    """Manages plugin lifecycle and state."""
+    
+    def __init__(self):
+        self.loaded_plugins: Dict[str, PluginBase] = {}
+        self.config = self.load_config()
+    
+    def load_config(self) -> Dict[str, Any]:
+        """Load the centralized plugin configuration."""
+        config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+        try:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.error(f"Failed to load plugin config: {str(e)}")
+            return {
+                "enabled_plugins": [],
+                "plugin_config": {},
+                "security": {"sanitize_all_inputs": True}
+            }
+    
+    def save_config(self) -> None:
+        """Save the current configuration."""
+        config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+        try:
+            with open(config_path, 'w') as f:
+                yaml.safe_dump(self.config, f)
+        except Exception as e:
+            logger.error(f"Failed to save plugin config: {str(e)}")
+    
+    def enable_plugin(self, plugin_name: str) -> Tuple[bool, str]:
+        """Enable a plugin."""
+        if plugin_name not in self.loaded_plugins:
+            return False, f"Plugin {plugin_name} not found"
+        
+        plugin = self.loaded_plugins[plugin_name]
+        if plugin_name not in self.config["enabled_plugins"]:
+            self.config["enabled_plugins"].append(plugin_name)
+            self.save_config()
+            plugin.on_enable()
+        return True, f"Plugin {plugin_name} enabled"
+    
+    def disable_plugin(self, plugin_name: str) -> Tuple[bool, str]:
+        """Disable a plugin."""
+        if plugin_name not in self.loaded_plugins:
+            return False, f"Plugin {plugin_name} not found"
+        
+        if plugin_name in self.config["enabled_plugins"]:
+            self.config["enabled_plugins"].remove(plugin_name)
+            self.save_config()
+            self.loaded_plugins[plugin_name].on_disable()
+        return True, f"Plugin {plugin_name} disabled"
+    
+    def unload_plugin(self, plugin_name: str) -> Tuple[bool, str]:
+        """Unload a plugin."""
+        if plugin_name not in self.loaded_plugins:
+            return False, f"Plugin {plugin_name} not found"
+        
+        plugin = self.loaded_plugins[plugin_name]
+        plugin.on_unload()
+        del self.loaded_plugins[plugin_name]
+        return True, f"Plugin {plugin_name} unloaded"
+    
+    def load_plugins(self) -> List[PluginBase]:
+        """Load plugins based on the centralized configuration."""
+        enabled_plugins = self.config.get("enabled_plugins", [])
+        plugins_dir = os.path.dirname(__file__)
+        webui_version = self.config.get("webui_version", "1.0.0")
+        
+        logger.info(f"Loading enabled plugins: {enabled_plugins}")
+        
+        # Clear existing plugins
+        self.loaded_plugins.clear()
+        
+        # Load enabled plugins using factory
+        for plugin_name in enabled_plugins:
+            # Create plugin using factory
+            plugin = PluginFactory.create_plugin(plugins_dir, plugin_name)
+            if not plugin:
+                continue
+            
+            # Check compatibility
+            is_compatible, reason = plugin.validate_compatibility(webui_version)
+            if not is_compatible:
+                logger.warning(
+                    f"Plugin {plugin.name} v{plugin.version} is not compatible: {reason}"
+                )
+                continue
+            
+            # Check permissions
+            has_permissions, reason = plugin._validate_permissions()
+            if not has_permissions:
+                logger.warning(f"Plugin {plugin.name} permission denied: {reason}")
+                continue
+            
+            # Apply config overrides
+            plugin_config = self.config.get("plugin_config", {}).get(plugin_name, {})
+            for key, value in plugin_config.items():
+                plugin.set_config(key, value)
+            
+            # Store plugin
+            self.loaded_plugins[plugin_name] = plugin
+            logger.info(f"Successfully loaded plugin: {plugin.name} v{plugin.version}")
+        
+        logger.info(f"Successfully loaded {len(self.loaded_plugins)} plugins")
+        return list(self.loaded_plugins.values())
+
+# Global plugin manager instance
+plugin_manager = PluginManager()
+
+def load_plugins() -> List[PluginBase]:
+    """Convenience function to load plugins using the global manager."""
+    return plugin_manager.load_plugins() 
+```
+
+
+# File: plugins/config.yaml
+```yaml
+# Global plugin configuration
+plugin_directory: plugins
+webui_version: 1.0.0
+
+# Plugin states
+enabled_plugins:
+  - twitter
+  - mock
+
+# Plugin-specific overrides
+plugin_config: {}
+
+# Global security settings
+security:
+  sanitize_all_inputs: true
+  allow_network_access: true
+  allow_file_access: true 
+```
+
+
+# File: plugins/factory.py
+```python
+import os
+import yaml
+import logging
+import importlib.util
+from typing import Dict, Any, Optional, Type, Tuple
+from .plugin_base import PluginBase
+
+logger = logging.getLogger(__name__)
+
+class PluginFactory:
+    """Factory for creating and configuring plugins."""
+    
+    @classmethod
+    def create_plugin(cls, plugin_dir: str, plugin_name: str) -> Optional[PluginBase]:
+        """Create and configure a plugin instance."""
+        try:
+            # Load manifest first
+            manifest = cls._load_manifest(plugin_dir, plugin_name)
+            if not manifest:
+                return None
+            
+            # Load plugin class
+            plugin_class = cls._load_plugin_class(plugin_dir, plugin_name)
+            if not plugin_class:
+                return None
+            
+            # Create plugin instance with manifest
+            return cls._instantiate_plugin(plugin_class, manifest)
+            
+        except Exception as e:
+            logger.error(f"Failed to create plugin {plugin_name}: {str(e)}")
+            return None
+    
+    @classmethod
+    def _load_manifest(cls, plugin_dir: str, plugin_name: str) -> Optional[Dict[str, Any]]:
+        """Load and validate plugin manifest."""
+        manifest_path = os.path.join(plugin_dir, plugin_name, "manifest.yaml")
+        try:
+            with open(manifest_path, 'r') as f:
+                manifest = yaml.safe_load(f) or {}
+            
+            # Validate required fields
+            if not manifest.get('name'):
+                logger.error(f"Manifest missing required 'name' field: {manifest_path}")
+                return None
+            if not manifest.get('version'):
+                logger.error(f"Manifest missing required 'version' field: {manifest_path}")
+                return None
+                
+            return manifest
+            
+        except Exception as e:
+            logger.error(f"Failed to load manifest from {manifest_path}: {str(e)}")
+            return None
+    
+    @classmethod
+    def _load_plugin_class(cls, plugin_dir: str, plugin_name: str) -> Optional[Type[PluginBase]]:
+        """Load plugin class from module."""
+        plugin_file = os.path.join(plugin_dir, plugin_name, f"{plugin_name}_plugin.py")
+        try:
+            # Load module
+            spec = importlib.util.spec_from_file_location(
+                f"plugins.{plugin_name}",
+                plugin_file
+            )
+            if spec is None or spec.loader is None:
+                logger.error(f"Failed to load plugin spec: {plugin_name}")
+                return None
+                
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # Find plugin class
+            for item_name in dir(module):
+                item = getattr(module, item_name)
+                if (isinstance(item, type) and 
+                    issubclass(item, PluginBase) and 
+                    item != PluginBase and 
+                    item_name.endswith('Plugin')):
+                    return item
+            
+            logger.error(f"No valid plugin class found in {plugin_file}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to load plugin class from {plugin_file}: {str(e)}")
+            return None
+    
+    @classmethod
+    def _instantiate_plugin(cls, plugin_class: Type[PluginBase], manifest: Dict[str, Any]) -> Optional[PluginBase]:
+        """Create plugin instance with manifest configuration."""
+        try:
+            # Create plugin instance with manifest injected
+            plugin = plugin_class(manifest=manifest)
+            
+            # Verify plugin loaded correctly
+            if plugin.name != manifest['name']:
+                logger.error(
+                    f"Plugin name mismatch for {plugin_class.__name__}: "
+                    f"manifest name '{manifest['name']}' != plugin name '{plugin.name}'"
+                )
+                return None
+            
+            logger.info(f"Successfully created plugin: {plugin.name} v{plugin.version}")
+            return plugin
+            
+        except Exception as e:
+            logger.error(f"Failed to instantiate plugin {plugin_class.__name__}: {str(e)}")
+            return None 
+```
+
+
+# File: plugins/mock/manifest.yaml
+```yaml
+name: Mock Plugin
+version: 1.0.0
+description: A simple mock plugin for demonstration
+min_webui_version: 1.0.0
+max_webui_version: 2.0.0
+author: Demo Author
+license: MIT
+homepage: https://github.com/example/mock-plugin
+changelog: CHANGELOG.md
+
+# Plugin configuration
+config:
+  enabled: true
+  auto_install_deps: true
+  environment_variables:
+    - ENABLE_MOCK_PLUGIN
+  custom_setting: "demo value"
+
+# Dependencies
+dependencies:
+  - gradio>=3.50.0
+  - pyyaml>=6.0.0
+
+# Security settings
+security:
+  required_permissions:
+    - basic_access
+    - file_access
+  input_sanitization:
+    - input_text
+  allow_network: false
+  allow_file_read: true
+  allow_file_write: false 
+```
+
+
+# File: plugins/mock/mock_plugin.py
+```python
+import gradio as gr
+from plugins.plugin_base import PluginBase
+import logging
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+class MockPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        # Call parent class initialization first
+        super().__init__(manifest=manifest)
+        
+        # Initialize plugin state
+        self.set_state('last_init', datetime.now().isoformat())
+        logger.info(f"{self.name} initialized")
+
+    def is_enabled(self) -> bool:
+        has_permissions, _ = self._validate_permissions()
+        return self.enabled and has_permissions
+
+    def on_enable(self) -> None:
+        """Handle plugin enabling."""
+        self.enabled = True
+        self.set_state('last_enabled', datetime.now().isoformat())
+        logger.info(f"{self.name} enabled")
+
+    def on_disable(self) -> None:
+        """Handle plugin disabling."""
+        self.enabled = False
+        self.set_state('last_disabled', datetime.now().isoformat())
+        logger.info(f"{self.name} disabled")
+
+    def on_unload(self) -> None:
+        """Clean up before unloading."""
+        self.set_state('last_unloaded', datetime.now().isoformat())
+        super().on_unload()  # Don't forget to call parent's on_unload
+        logger.info(f"{self.name} unloaded")
+
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        """Create a simple UI for demonstration."""
+        try:
+            with main_tabs:
+                with gr.TabItem("Mock Plugin"):
+                    gr.Markdown(f"## {self.name} v{self.version}")
+                    gr.Markdown(f"_{self.description}_")
+                    
+                    with gr.Row():
+                        text_input = gr.Textbox(
+                            label="Input Text",
+                            placeholder="Enter some text"
+                        )
+                        output_text = gr.Textbox(
+                            label="Output",
+                            interactive=False
+                        )
+                    
+                    def process_text(text: str) -> str:
+                        # Sanitize input
+                        text = self._sanitize_input(text)
+                        # Store last processed text in state
+                        self.set_state('last_processed', text)
+                        return f"Processed: {text.upper()}"
+                    
+                    process_button = gr.Button("Process")
+                    process_button.click(
+                        fn=process_text,
+                        inputs=[text_input],
+                        outputs=[output_text]
+                    )
+                    
+                    # Plugin state display
+                    with gr.Row():
+                        gr.Markdown("### Plugin State")
+                        state_text = gr.Markdown(
+                            f"""
+                            - Last Initialized: {self.get_state('last_init', 'Never')}
+                            - Last Enabled: {self.get_state('last_enabled', 'Never')}
+                            - Last Disabled: {self.get_state('last_disabled', 'Never')}
+                            - Last Processed Text: {self.get_state('last_processed', 'None')}
+                            """
+                        )
+                    
+        except Exception as e:
+            logger.error(f"Failed to create Mock plugin UI: {str(e)}")
+            raise 
+```
+
+
+# File: plugins/plugin_base.py
+```python
+from abc import ABC, abstractmethod
+import gradio as gr
+import yaml
+import os
+import re
+import json
+import subprocess
+from typing import Optional, Dict, List, Any, Tuple
+from packaging import version
+import html
+import logging
+
+logger = logging.getLogger(__name__)
+
+class PluginBase(ABC):
+    """Abstract base class for all plugins."""
+    
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        """Initialize plugin with optional manifest injection."""
+        # Initialize base attributes with defaults
+        self._init_base_attributes()
+        
+        # Skip further initialization for base class
+        if self.__class__ == PluginBase:
+            return
+            
+        # Apply manifest if provided, otherwise try to load it
+        if manifest:
+            self.manifest = manifest
+            self._init_attributes_from_manifest()
+        else:
+            self._load_and_apply_manifest()
+        
+        # Install dependencies if needed
+        if self.get_config('auto_install_deps', True):
+            self._install_dependencies()
+            
+        # Initialize plugin
+        self.on_init()
+    
+    def _init_base_attributes(self) -> None:
+        """Initialize base attributes with defaults."""
+        self.name: str = "Base Plugin"
+        self.description: str = "Base plugin description"
+        self.version: str = "1.0.0"
+        self.min_webui_version: str = "1.0.0"
+        self.max_webui_version: Optional[str] = None
+        self.author: Optional[str] = None
+        self.license: Optional[str] = None
+        self.config: Dict[str, Any] = {}
+        self.manifest: Dict[str, Any] = {}
+        self.state: Dict[str, Any] = {}
+        self.enabled: bool = True
+    
+    def _load_and_apply_manifest(self) -> None:
+        """Load and apply manifest from file."""
+        manifest_path = os.path.join(os.path.dirname(self.__class__.__module__), "manifest.yaml")
+        try:
+            with open(manifest_path, 'r') as f:
+                self.manifest = yaml.safe_load(f) or {}
+            self._init_attributes_from_manifest()
+        except Exception as e:
+            logger.error(f"Failed to load manifest for {self.__class__.__name__}: {str(e)}")
+    
+    def _init_attributes_from_manifest(self) -> None:
+        """Initialize attributes from manifest with defaults."""
+        if not self.manifest:
+            return
+            
+        self.name = self.manifest.get('name', self.name)
+        self.description = self.manifest.get('description', self.description)
+        self.version = self.manifest.get('version', self.version)
+        self.min_webui_version = self.manifest.get('min_webui_version', self.min_webui_version)
+        self.max_webui_version = self.manifest.get('max_webui_version')
+        self.author = self.manifest.get('author')
+        self.license = self.manifest.get('license')
+        
+        # Load configuration
+        self.config = self.manifest.get('config', {})
+        self.enabled = self.get_config('enabled', True)
+        
+        # Initialize state
+        self.state = {}
+        self._load_state()
+    
+    def _install_dependencies(self) -> None:
+        """Install plugin dependencies from manifest"""
+        if 'dependencies' not in self.manifest:
+            return
+            
+        try:
+            # Check if dependencies are already installed with correct versions
+            import pkg_resources
+            missing_deps = []
+            for dep in self.manifest['dependencies']:
+                try:
+                    pkg_resources.require(dep)
+                except pkg_resources.DistributionNotFound:
+                    missing_deps.append(dep)
+                except pkg_resources.VersionConflict as e:
+                    logger.warning(f"Version conflict for {dep}: {str(e)}")
+                    missing_deps.append(dep)
+            
+            if missing_deps:
+                logger.info(f"Installing missing dependencies for {self.name}: {missing_deps}")
+                subprocess.check_call(['pip', 'install', '--quiet'] + missing_deps)
+        except Exception as e:
+            logger.error(f"Failed to install dependencies for {self.name}: {str(e)}")
+            logger.info("Please install the following dependencies manually:")
+            for dep in self.manifest.get('dependencies', []):
+                logger.info(f"  - {dep}")
+    
+    def _load_state(self) -> None:
+        """Load persisted plugin state"""
+        state_file = os.path.join(os.path.dirname(self.__class__.__module__), "state.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r') as f:
+                    self.state = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load state for {self.name}: {str(e)}")
+    
+    def _save_state(self) -> None:
+        """Persist plugin state"""
+        state_file = os.path.join(os.path.dirname(self.__class__.__module__), "state.json")
+        try:
+            with open(state_file, 'w') as f:
+                json.dump(self.state, f)
+        except Exception as e:
+            logger.error(f"Failed to save state for {self.name}: {str(e)}")
+    
+    def _sanitize_input(self, input_str: str) -> str:
+        """Sanitize user input to prevent injection attacks"""
+        if not isinstance(input_str, str):
+            return str(input_str)
+            
+        # Remove any potential script tags
+        input_str = re.sub(r'<script.*?>.*?</script>', '', input_str, flags=re.DOTALL)
+        # Remove potential event handlers
+        input_str = re.sub(r' on\w+=".*?"', '', input_str)
+        # HTML escape the input
+        return html.escape(input_str)
+    
+    def _validate_permissions(self) -> Tuple[bool, str]:
+        """Validate that the plugin has required permissions"""
+        required_permissions = self.manifest.get('security', {}).get('required_permissions', [])
+        global_security = self.get_config('security', {})
+        
+        for permission in required_permissions:
+            if permission == 'network_access' and not global_security.get('allow_network_access'):
+                return False, f"Network access denied for {self.name}"
+            elif permission == 'file_access' and not global_security.get('allow_file_access'):
+                return False, f"File access denied for {self.name}"
+            elif permission == 'system_access' and not global_security.get('allow_system_access'):
+                return False, f"System access denied for {self.name}"
+        
+        return True, "All permissions granted"
+    
+    # Lifecycle hooks
+    def on_init(self) -> None:
+        """Called after plugin initialization"""
+        pass
+    
+    def on_enable(self) -> None:
+        """Called when plugin is enabled"""
+        pass
+    
+    def on_disable(self) -> None:
+        """Called when plugin is disabled"""
+        pass
+    
+    def on_unload(self) -> None:
+        """Called before plugin is unloaded"""
+        self._save_state()
+    
+    @abstractmethod
+    def is_enabled(self) -> bool:
+        """Check if the plugin is enabled."""
+        pass
+    
+    @abstractmethod
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        """Create the plugin's UI components."""
+        pass
+    
+    def get_version(self) -> str:
+        """Get the plugin version."""
+        return self.version
+    
+    def get_min_webui_version(self) -> str:
+        """Get the minimum required webui version."""
+        return self.min_webui_version
+    
+    def validate_compatibility(self, webui_version: str) -> Tuple[bool, str]:
+        """Validate plugin compatibility with webui version."""
+        try:
+            current = version.parse(webui_version)
+            minimum = version.parse(self.min_webui_version)
+            
+            if current < minimum:
+                return False, f"Requires minimum version {self.min_webui_version}"
+            
+            if self.max_webui_version:
+                maximum = version.parse(self.max_webui_version)
+                if current > maximum:
+                    return False, f"Requires maximum version {self.max_webui_version}"
+            
+            return True, "Compatible"
+        except Exception as e:
+            return False, f"Version validation error: {str(e)}"
+    
+    def get_config(self, key: str, default: Any = None) -> Any:
+        """Get a configuration value."""
+        return self.config.get(key, default)
+    
+    def set_config(self, key: str, value: Any) -> None:
+        """Set a configuration value and persist it."""
+        self.config[key] = value
+        self.manifest['config'] = self.config
+        
+        # Save updated manifest
+        manifest_path = os.path.join(os.path.dirname(self.__class__.__module__), "manifest.yaml")
+        try:
+            with open(manifest_path, 'w') as f:
+                yaml.safe_dump(self.manifest, f)
+        except Exception as e:
+            logger.error(f"Failed to save config for {self.name}: {str(e)}")
+    
+    def get_state(self, key: str, default: Any = None) -> Any:
+        """Get a state value."""
+        return self.state.get(key, default)
+    
+    def set_state(self, key: str, value: Any) -> None:
+        """Set a state value and persist it."""
+        self.state[key] = value
+        self._save_state() 
+```
+
+
+# File: plugins/tests/test_plugin_loader.py
+```python
+import unittest
+import os
+import tempfile
+import shutil
+import yaml
+from typing import Dict, Any
+from datetime import datetime
+from plugins import load_plugins, PluginBase, plugin_manager, PluginFactory
+
+class TestPluginSystem(unittest.TestCase):
+    def setUp(self):
+        """Set up test environment."""
+        # Create a temporary directory for test plugins
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        
+        # Create plugins directory
+        self.plugins_dir = os.path.join(self.test_dir, "plugins")
+        os.makedirs(self.plugins_dir)
+        
+        # Create config file
+        self.config_path = os.path.join(self.plugins_dir, "config.yaml")
+        with open(self.config_path, 'w') as f:
+            yaml.dump({
+                "enabled_plugins": [],
+                "plugin_config": {},
+                "security": {
+                    "allow_network_access": True,
+                    "allow_file_access": True,
+                    "sanitize_all_inputs": True
+                }
+            }, f)
+    
+    def create_test_plugin(self, name: str, manifest_data: Dict[str, Any], plugin_content: str) -> None:
+        """Helper to create a test plugin with manifest."""
+        plugin_dir = os.path.join(self.plugins_dir, name)
+        os.makedirs(plugin_dir)
+        
+        # Create plugin file
+        with open(os.path.join(plugin_dir, f"{name}_plugin.py"), 'w') as f:
+            f.write(plugin_content)
+            
+        # Create manifest file
+        with open(os.path.join(plugin_dir, "manifest.yaml"), 'w') as f:
+            yaml.dump(manifest_data, f)
+            
+        # Create empty __init__.py
+        with open(os.path.join(plugin_dir, "__init__.py"), 'w') as f:
+            f.write("")
+        
+        # Update config to enable the plugin
+        with open(self.config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        config["enabled_plugins"].append(name)
+        with open(self.config_path, 'w') as f:
+            yaml.dump(config, f)
+    
+    def test_factory_create_plugin(self):
+        """Test plugin creation using factory."""
+        manifest_data = {
+            "name": "Test Plugin",
+            "version": "1.0.0",
+            "description": "A test plugin",
+            "min_webui_version": "1.0.0",
+            "config": {"enabled": True}
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        has_permissions, _ = self._validate_permissions()
+        return self.enabled and has_permissions
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test", manifest_data, plugin_content)
+        
+        # Test factory creation
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:  # Add null check
+            self.assertEqual(plugin.name, "Test Plugin")
+            self.assertEqual(plugin.version, "1.0.0")
+    
+    def test_dependency_injection(self):
+        """Test manifest injection into plugin."""
+        manifest = {
+            "name": "Injected Plugin",
+            "version": "2.0.0",
+            "description": "Testing injection",
+            "min_webui_version": "1.0.0",
+            "config": {"custom_setting": "test_value"}
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_inject", manifest, plugin_content)
+        
+        # Test plugin creation with injected manifest
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_inject")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:  # Add null check
+            self.assertEqual(plugin.name, "Injected Plugin")
+            self.assertEqual(plugin.get_config("custom_setting"), "test_value")
+    
+    def test_plugin_lifecycle(self):
+        """Test plugin lifecycle hooks."""
+        manifest = {
+            "name": "Lifecycle Plugin",
+            "version": "1.0.0",
+            "description": "Testing lifecycle",
+            "min_webui_version": "1.0.0",
+            "config": {"enabled": True}
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+from datetime import datetime
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        self.set_state('init_time', datetime.now().isoformat())
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+        
+    def on_enable(self) -> None:
+        self.set_state('enabled_time', datetime.now().isoformat())
+        
+    def on_disable(self) -> None:
+        self.set_state('disabled_time', datetime.now().isoformat())
+'''
+        self.create_test_plugin("test_lifecycle", manifest, plugin_content)
+        
+        # Test lifecycle
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_lifecycle")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:  # Add null check
+            self.assertIsNotNone(plugin.get_state('init_time'))
+            
+            # Test enable/disable
+            plugin.on_enable()
+            self.assertIsNotNone(plugin.get_state('enabled_time'))
+            
+            plugin.on_disable()
+            self.assertIsNotNone(plugin.get_state('disabled_time'))
+    
+    def test_plugin_security(self):
+        """Test plugin security features."""
+        manifest = {
+            "name": "Security Plugin",
+            "version": "1.0.0",
+            "description": "Testing security",
+            "min_webui_version": "1.0.0",
+            "config": {"enabled": True},
+            "security": {
+                "required_permissions": ["network_access"],
+                "input_sanitization": ["test_input"]
+            }
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        has_permissions, _ = self._validate_permissions()
+        return self.enabled and has_permissions
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+        
+    def _sanitize_test_input(self, text: str) -> str:
+        return self._sanitize_input(text)
+'''
+        self.create_test_plugin("test_security", manifest, plugin_content)
+        
+        # Test security features
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_security")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:  # Add null check
+            # Test permissions
+            has_permissions, _ = plugin._validate_permissions()
+            self.assertTrue(has_permissions)
+            
+            # Test input sanitization
+            test_input = '<script>alert("xss")</script>Hello'
+            sanitized = plugin._sanitize_test_input(test_input)
+            self.assertNotIn('<script>', sanitized)
+            self.assertIn('Hello', sanitized)
+    
+    def test_version_compatibility(self):
+        """Test version compatibility checking."""
+        manifest = {
+            "name": "Version Plugin",
+            "version": "1.0.0",
+            "description": "Testing versions",
+            "min_webui_version": "2.0.0",  # Incompatible
+            "max_webui_version": "3.0.0",
+            "config": {"enabled": True}
+        }
+        
+        plugin_content = '''
+from plugins.plugin_base import PluginBase
+import gradio as gr
+from typing import Optional, Dict, Any
+
+class TestPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        super().__init__(manifest=manifest)
+        
+    def is_enabled(self) -> bool:
+        return True
+        
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        pass
+'''
+        self.create_test_plugin("test_version", manifest, plugin_content)
+        
+        # Test version compatibility
+        plugin = PluginFactory.create_plugin(self.plugins_dir, "test_version")
+        self.assertIsNotNone(plugin, "Plugin should be created successfully")
+        if plugin:  # Add null check
+            is_compatible, reason = plugin.validate_compatibility("1.0.0")
+            self.assertFalse(is_compatible)
+            self.assertIn("minimum version", reason)
+
+if __name__ == '__main__':
+    unittest.main() 
+```
+
+
+# File: plugins/twitter/manifest.yaml
+```yaml
+name: Twitter Plugin
+version: 1.0.0
+description: A mock Twitter automation plugin for demonstration purposes
+min_webui_version: 1.0.0
+author: Demo Author
+license: MIT
+
+config:
+  enabled: true
+  mock_delay: 1.0  # Simulated delay in seconds
+
+security:
+  sanitize_all_inputs: true 
+```
+
+
+# File: plugins/twitter/twitter_plugin.py
+```python
+import gradio as gr
+import os
+from plugins.plugin_base import PluginBase
+import logging
+from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+class TwitterPlugin(PluginBase):
+    def __init__(self, manifest: Optional[Dict[str, Any]] = None):
+        # Call parent class initialization first
+        super().__init__(manifest=manifest)
+        
+        # Initialize mock state
+        self.tweets = []
+        self.logged_in = False
+        
+    def is_enabled(self) -> bool:
+        has_permissions, _ = self._validate_permissions()
+        return self.enabled and has_permissions
+
+    def create_ui(self, main_tabs: gr.Tabs) -> None:
+        """Attach the plugin's UI elements to the main web UI."""
+        try:
+            with main_tabs:
+                with gr.TabItem("Twitter Automation"):
+                    gr.Markdown(f"## {self.name} v{self.version}")
+                    gr.Markdown(f"_{self.description}_")
+                    
+                    with gr.Row():
+                        username = gr.Textbox(
+                            label="Twitter Username",
+                            placeholder="Enter your Twitter username"
+                        )
+                        password = gr.Textbox(
+                            label="Password",
+                            type="password",
+                            placeholder="Enter your password"
+                        )
+                    
+                    def mock_login(username: str, password: str) -> str:
+                        if not username or not password:
+                            return "Please enter both username and password"
+                        self.logged_in = True
+                        return f"Logged in as {username} (Mock)"
+                    
+                    login_button = gr.Button("Login")
+                    login_result = gr.Textbox(label="Login Status")
+                    login_button.click(
+                        fn=mock_login,
+                        inputs=[username, password],
+                        outputs=[login_result]
+                    )
+                    
+                    def mock_post_tweet(tweet_content: str) -> str:
+                        if not self.logged_in:
+                            return "Please log in first"
+                            
+                        # Sanitize input
+                        tweet_content = self._sanitize_input(tweet_content)
+                        if not tweet_content:
+                            return "Tweet content cannot be empty"
+                            
+                        # Store tweet in mock state
+                        self.tweets.append(tweet_content)
+                        return f"Tweet posted successfully! (Mock) Total tweets: {len(self.tweets)}"
+                    
+                    with gr.Row():
+                        tweet_text = gr.Textbox(
+                            label="Tweet Content",
+                            lines=3,
+                            placeholder="What's happening?"
+                        )
+                        post_button = gr.Button("Post Tweet")
+                    post_result = gr.Textbox(label="Post Result")
+                    
+                    def mock_search_tweets(query: str) -> str:
+                        if not self.logged_in:
+                            return "Please log in first"
+                            
+                        # Sanitize input
+                        query = self._sanitize_input(query)
+                        if not query:
+                            return "Search query cannot be empty"
+                            
+                        # Search in mock tweets
+                        matching_tweets = [
+                            tweet for tweet in self.tweets 
+                            if query.lower() in tweet.lower()
+                        ]
+                        
+                        if not matching_tweets:
+                            return "No tweets found matching your query"
+                            
+                        return "
+
+".join([
+                            f"Tweet {i+1}: {tweet}" 
+                            for i, tweet in enumerate(matching_tweets)
+                        ])
+                    
+                    with gr.Row():
+                        search_query = gr.Textbox(
+                            label="Search Query",
+                            placeholder="Enter search terms"
+                        )
+                        search_button = gr.Button("Search Tweets")
+                    search_result = gr.Textbox(label="Search Results", lines=10)
+                    
+                    # Connect the buttons to their functions
+                    post_button.click(
+                        fn=mock_post_tweet,
+                        inputs=[tweet_text],
+                        outputs=[post_result]
+                    )
+                    
+                    search_button.click(
+                        fn=mock_search_tweets,
+                        inputs=[search_query],
+                        outputs=[search_result]
+                    )
+                    
+        except Exception as e:
+            logger.error(f"Failed to create Twitter plugin UI: {str(e)}")
+            raise 
+```
+

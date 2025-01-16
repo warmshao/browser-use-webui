@@ -44,6 +44,8 @@ from src.utils.utils import update_model_dropdown, get_latest_files, capture_scr
 from dotenv import load_dotenv
 load_dotenv()
 
+from plugins import load_plugins  # Add this import at the top
+
 # Global variables for persistence
 _global_browser = None
 _global_browser_context = None
@@ -866,6 +868,22 @@ def create_ui(theme_name="Ocean"):
                     inputs=save_recording_path,
                     outputs=recordings_gallery
                 )
+
+            # Load and create plugin UIs
+            try:
+                plugin_list = load_plugins()
+                for plugin in plugin_list:
+                    if plugin.is_enabled():
+                        try:
+                            plugin.create_ui(tabs)
+                            logger.info(f"Loaded plugin UI: {plugin.name} v{plugin.version}")
+                        except Exception as e:
+                            logger.error(f"Failed to load UI for plugin {plugin.name}: {str(e)}")
+                            # Continue loading other plugins even if one fails
+                            continue
+            except Exception as e:
+                logger.error(f"Failed to load plugins: {str(e)}")
+                # Continue with the main application even if plugin loading fails
 
         # Attach the callback to the LLM provider dropdown
         llm_provider.change(
