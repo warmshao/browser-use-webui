@@ -802,7 +802,6 @@ def create_ui(theme_name="Ocean"):
 
                 load_button = gr.Button("💾 Load & Run Config", variant="secondary", scale=1)
 
-
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
