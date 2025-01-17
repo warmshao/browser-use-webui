@@ -184,3 +184,6 @@ AgentHistoryList.json
 
 # For Docker
 data/
+
+# For Config Files (Current Settings)
+.config.pkl
