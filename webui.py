@@ -39,7 +39,7 @@ from src.browser.config import BrowserPersistenceConfig
 from src.browser.custom_context import BrowserContextConfig, CustomBrowserContext
 from src.controller.custom_controller import CustomController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
-from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
+from src.utils.utils import load_config_from_file, save_config_to_file, update_model_dropdown, get_latest_files, capture_screenshot
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -422,6 +422,7 @@ async def run_with_stream(
     max_actions_per_step,
     tool_call_in_content
 ):
+    save_config_to_file(locals())
     global _global_agent_state
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
@@ -565,6 +566,12 @@ async def run_with_stream(
                 gr.update(interactive=True)    # Re-enable run button
             ]
 
+async def load_and_run_with_stream():
+    config = load_config_from_file()
+    async for output in run_with_stream(**config):
+        # You might want to process the `output` here or log it if needed
+        yield output
+
 # Define the theme map globally
 theme_map = {
     "Default": Default(),
@@ -662,6 +669,19 @@ def create_ui(theme_name="Ocean"):
                         label="Use Tool Calls in Content",
                         value=True,
                         info="Enable Tool Calls in content",
+                    )
+                    load_config_button = gr.Button("🔄 Load Saved Config")
+                    config_preview = gr.Textbox(
+                        label="Loaded Configuration",
+                        value="",
+                        lines=10,
+                        interactive=False
+                    )
+
+                    load_config_button.click(
+                        fn=lambda: str(load_config_from_file()),
+                        inputs=[],
+                        outputs=config_preview
                     )
 
             with gr.TabItem("🔧 LLM Configuration", id=2):
@@ -781,6 +801,9 @@ def create_ui(theme_name="Ocean"):
                     info="Optional hints to help the LLM complete the task",
                 )
 
+                load_button = gr.Button("💾 Load & Run Config", variant="secondary", scale=1)
+
+
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
@@ -847,6 +870,23 @@ def create_ui(theme_name="Ocean"):
                         agent_history_file,     # Agent history file
                         stop_button,            # Stop button
                         run_button              # Run button
+                    ],
+                )
+
+                load_button.click(
+                    fn=load_and_run_with_stream,
+                    inputs=[],
+                    outputs=[
+                        browser_view,
+                        final_result_output,
+                        errors_output,
+                        model_actions_output,
+                        model_thoughts_output,
+                        recording_display,
+                        trace_file,
+                        agent_history_file,
+                        stop_button,
+                        run_button
                     ],
                 )
 
