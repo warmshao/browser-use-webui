@@ -6,6 +6,7 @@
 # @FileName: utils.py
 import base64
 import os
+import pickle
 import time
 from pathlib import Path
 from typing import Dict, Optional
@@ -201,3 +202,13 @@ async def capture_screenshot(browser_context):
         return encoded
     except Exception as e:
         return None
+
+def load_config_from_file(file_path: str='./.config.pkl',):
+    with open(file_path, 'rb') as file:
+        loaded_person = pickle.load(file)
+    return loaded_person
+
+
+def save_config_to_file(config, file_path: str='./.config.pkl',) -> None:
+    with open(file_path, 'wb') as file:
+        pickle.dump(config, file)
