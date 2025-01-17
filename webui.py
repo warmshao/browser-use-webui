@@ -569,7 +569,6 @@ async def run_with_stream(
 async def load_and_run_with_stream():
     config = load_config_from_file()
     async for output in run_with_stream(**config):
-        # You might want to process the `output` here or log it if needed
         yield output
 
 # Define the theme map globally
