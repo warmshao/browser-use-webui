@@ -1,0 +1,17 @@
+# Global plugin configuration
+plugin_directory: plugins
+webui_version: 1.0.0
+
+# Plugin states
+enabled_plugins:
+  - twitter
+  - mock
+
+# Plugin-specific overrides
+plugin_config: {}
+
+# Global security settings
+security:
+  sanitize_all_inputs: true
+  allow_network_access: true
+  allow_file_access: true 
