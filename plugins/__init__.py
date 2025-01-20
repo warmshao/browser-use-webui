@@ -73,6 +73,10 @@ class PluginManager:
     def load_plugins(self) -> List[PluginBase]:
         """Load plugins based on the centralized configuration."""
         enabled_plugins = self.config.get("enabled_plugins", [])
+        if enabled_plugins is None:
+            logger.info("No plugins are currently enabled")
+            return []
+            
         plugins_dir = os.path.dirname(__file__)
         webui_version = self.config.get("webui_version", "1.0.0")
         

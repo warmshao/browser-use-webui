@@ -1,4 +1,4 @@
-name: Twitter Plugin
+name: Mock2 Plugin
 version: 1.0.0
 description: A mock Twitter automation plugin for demonstration purposes
 min_webui_version: 1.0.0

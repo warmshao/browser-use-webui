@@ -23,7 +23,7 @@ class TwitterPlugin(PluginBase):
         """Attach the plugin's UI elements to the main web UI."""
         try:
             with main_tabs:
-                with gr.TabItem("Twitter Automation"):
+                with gr.TabItem("Mock Twitter"):
                     gr.Markdown(f"## {self.name} v{self.version}")
                     gr.Markdown(f"_{self.description}_")
                     

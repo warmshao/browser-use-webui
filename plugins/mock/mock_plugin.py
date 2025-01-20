@@ -37,8 +37,17 @@ class MockPlugin(PluginBase):
         super().on_unload()  # Don't forget to call parent's on_unload
         logger.info(f"{self.name} unloaded")
 
+    def get_state_display(self) -> str:
+        """Generate the state display text."""
+        return f"""
+        - Last Initialized: {self.get_state('last_init', 'Never')}
+        - Last Enabled: {self.get_state('last_enabled', 'Never')}
+        - Last Disabled: {self.get_state('last_disabled', 'Never')}
+        - Last Processed Text: {self.get_state('last_processed', 'None')}
+        """
+
     def create_ui(self, main_tabs: gr.Tabs) -> None:
-        """Create a simple UI for demonstration."""
+        """Attach the plugin's UI elements to the main web UI."""
         try:
             with main_tabs:
                 with gr.TabItem("Mock Plugin"):
@@ -95,13 +104,14 @@ class MockPlugin(PluginBase):
                     with gr.Row():
                         gr.Markdown("### Plugin State")
                         state_text = gr.Markdown(
-                            value=lambda: f"""
-                            - Last Initialized: {self.get_state('last_init', 'Never')}
-                            - Last Enabled: {self.get_state('last_enabled', 'Never')}
-                            - Last Disabled: {self.get_state('last_disabled', 'Never')}
-                            - Last Processed Text: {self.get_state('last_processed', 'None')}
-                            """,
-                            every=1  # Update every second
+                            value=self.get_state_display()
+                        )
+                        
+                        # Update state display when processing text
+                        process_button.click(
+                            fn=self.get_state_display,
+                            inputs=[],
+                            outputs=[state_text]
                         )
                     
         except Exception as e:

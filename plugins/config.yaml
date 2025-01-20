@@ -2,10 +2,10 @@
 plugin_directory: plugins
 webui_version: 1.0.0
 
-# Plugin states
+# Plugin states - remove the # to enable a plugin
 enabled_plugins:
-  - twitter
-  - mock
+  #- mock2
+  #- mock
 
 # Plugin-specific overrides
 plugin_config: {}
