@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
+from langchain_core.messages import HumanMessage
 
 
 def get_llm_model(provider: str, **kwargs):
@@ -66,12 +67,54 @@ def get_llm_model(provider: str, **kwargs):
         else:
             api_key = kwargs.get("api_key")
 
-        return ChatOpenAI(
-            model=kwargs.get("model_name", 'deepseek-chat'),
-            temperature=kwargs.get("temperature", 0.0),
-            base_url=base_url,
-            api_key=api_key
-        )
+        model_name = kwargs.get("model_name", 'deepseek-chat')
+        
+        if model_name == 'deepseek-reasoner':
+            # Custom handling for deepseek-reasoner
+            class DeepseekReasonerChat(ChatOpenAI):
+                def invoke(self, messages):
+                    # Ensure messages alternate between user and assistant
+                    interleaved_messages = []
+                    last_role = None
+                    
+                    for msg in messages:
+                        current_role = 'user' if isinstance(msg, HumanMessage) else 'assistant'
+                        
+                        # If same role as last message, combine them
+                        if current_role == last_role and interleaved_messages:
+                            if isinstance(msg.content, dict):
+                                text = msg.content.get('text', '')
+                                if 'reasoning_content' in msg.content:
+                                    del msg.content['reasoning_content']
+                            else:
+                                text = str(msg.content)
+                            interleaved_messages[-1].content += "\n" + text
+                        else:
+                            # Clean message content if needed
+                            if isinstance(msg.content, dict):
+                                if 'reasoning_content' in msg.content:
+                                    del msg.content['reasoning_content']
+                                msg.content = msg.content.get('text', '')
+                            interleaved_messages.append(msg)
+                            last_role = current_role
+
+                    response = super().invoke(interleaved_messages)
+                    return response
+
+            return DeepseekReasonerChat(
+                model=model_name,
+                temperature=kwargs.get("temperature", 0.0),
+                base_url=base_url,
+                api_key=api_key
+            )
+        else:
+            # Default handling for other Deepseek models
+            return ChatOpenAI(
+                model=model_name,
+                temperature=kwargs.get("temperature", 0.0),
+                base_url=base_url,
+                api_key=api_key
+            )
     elif provider == 'gemini':
         if not kwargs.get("api_key", ""):
             api_key = os.getenv("GOOGLE_API_KEY", "")
