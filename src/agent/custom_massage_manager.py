@@ -37,7 +37,7 @@ class CustomMassageManager(MessageManager):
             task: str,
             action_descriptions: str,
             system_prompt_class: Type[SystemPrompt],
-            max_input_tokens: int = 128000,
+            max_input_tokens: int = 65000,
             estimated_tokens_per_character: int = 3,
             image_tokens: int = 800,
             include_attributes: list[str] = [],

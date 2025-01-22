@@ -77,7 +77,7 @@ class CustomAgent(Agent):
             max_failures: int = 5,
             retry_delay: int = 10,
             system_prompt_class: Type[SystemPrompt] = SystemPrompt,
-            max_input_tokens: int = 128000,
+            max_input_tokens: int = 65000,
             validate_output: bool = False,
             include_attributes: list[str] = [
                 'title',
