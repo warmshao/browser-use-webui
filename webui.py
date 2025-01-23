@@ -40,7 +40,7 @@ from src.browser.custom_context import BrowserContextConfig, CustomBrowserContex
 from src.controller.custom_controller import CustomController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
 from src.utils.default_config_settings import default_config, load_config_from_file, save_config_to_file, save_current_config, update_ui_from_config
-from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
+from src.utils.utils import toggle_textbox, update_model_dropdown, get_latest_files, capture_screenshot
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -766,6 +766,8 @@ def create_ui(config, theme_name="Ocean"):
                         info="Specify the directory where agent history should be saved.",
                         interactive=True,
                     )
+
+                    enable_recording.change(fn=toggle_textbox, inputs=enable_recording, outputs=save_recording_path)
 
             with gr.TabItem("🤖 Run Agent", id=4):
                 task = gr.Textbox(
