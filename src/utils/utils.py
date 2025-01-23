@@ -165,6 +165,8 @@ def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Di
             print(f"Error getting latest {file_type} file: {e}")
             
     return latest_files
+
+
 async def capture_screenshot(browser_context):
     """Capture and encode a screenshot"""
     # Extract the Playwright browser instance
@@ -201,3 +203,11 @@ async def capture_screenshot(browser_context):
         return encoded
     except Exception as e:
         return None
+
+
+def toggle_textbox(show):
+    """Toggle the visibility of the textbox based on checkbox state."""
+    if show:
+        return gr.update(visible=True)  # Show the textbox
+    else:
+        return gr.update(visible=False)  # Hide the textbox
