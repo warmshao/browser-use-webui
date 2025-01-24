@@ -42,6 +42,15 @@ from .custom_massage_manager import CustomMassageManager
 from .custom_views import CustomAgentOutput, CustomAgentStepInfo
 
 logger = logging.getLogger(__name__)
+import re
+
+def remove_think_tags(text: str) -> str:
+    """
+    Removes <think>...</think> segments from the raw text 
+    so that JSON parsing won't be broken by the extra content.
+    """
+    # DOTALL allows '.' to match newlines
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
 
 
 class CustomAgent(Agent):
@@ -157,13 +166,13 @@ class CustomAgent(Agent):
         if completed_contents and "None" not in completed_contents:
             step_info.task_progress = completed_contents
 
-    @time_execution_async("--get_next_action")
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
-        """Get next action from LLM based on current state"""
         try:
+            # Try using your LLM with structured output first
             structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
-            response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
+            response: dict[str, Any] = await structured_llm.ainvoke(input_messages)
 
+            # If the structured parse succeeds, we can just use the 'parsed' object
             parsed: AgentOutput = response['parsed']
             # cut the number of actions to max_actions_per_step
             parsed.action = parsed.action[: self.max_actions_per_step]
@@ -171,17 +180,28 @@ class CustomAgent(Agent):
             self.n_steps += 1
 
             return parsed
+
         except Exception as e:
-            # If something goes wrong, try to invoke the LLM again without structured output,
-            # and Manually parse the response. Temporarily solution for DeepSeek
+            # If the structured parse failed or something went wrong, fallback to manual JSON parsing
             ret = self.llm.invoke(input_messages)
+            
+            # 1) Extract the raw text
             if isinstance(ret.content, list):
-                parsed_json = json.loads(ret.content[0].replace("```json", "").replace("```", ""))
+                text = ret.content[0]
             else:
-                parsed_json = json.loads(ret.content.replace("```json", "").replace("```", ""))
+                text = ret.content
+            
+            # 2) Remove <think>...</think> or any other undesired tags
+            text = remove_think_tags(text)
+            
+            # 3) Clean up triple backticks, etc. 
+            text = text.replace("```json", "").replace("```", "")
+
+            # 4) Now do a manual parse
+            parsed_json = json.loads(text)
             parsed: AgentOutput = self.AgentOutput(**parsed_json)
             if parsed is None:
-                raise ValueError(f'Could not parse response.')
+                raise ValueError('Could not parse response into AgentOutput.')
 
             # cut the number of actions to max_actions_per_step
             parsed.action = parsed.action[: self.max_actions_per_step]
