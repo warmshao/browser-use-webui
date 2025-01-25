@@ -4,3 +4,11 @@ pyperclip==1.9.0
 gradio==5.9.1
 langchain-ollama==0.2.2
 langchain-openai==0.2.14
+langchain-community==0.3.15
+faiss-cpu==1.9.0
+python-docx==1.1.2
+striprtf==0.0.28
+pytesseract==0.3.13
+openpyxl==3.1.5
+pandas==2.2.3
+PyPDF2==3.0.1
