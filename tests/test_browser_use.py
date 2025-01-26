@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/2
-# @Author  : wenshao
-# @ProjectName: browser-use-webui
-# @FileName: test_browser_use.py
 import pdb
 
 from dotenv import load_dotenv
@@ -247,15 +242,15 @@ async def test_browser_use_custom_v2():
     #     api_key=os.getenv("GOOGLE_API_KEY", "")
     # )
 
-    # llm = utils.get_llm_model(
-    #     provider="deepseek",
-    #     model_name="deepseek-chat",
-    #     temperature=0.8
-    # )
-
     llm = utils.get_llm_model(
-        provider="ollama", model_name="qwen2.5:7b", temperature=0.5
+        provider="deepseek",
+        model_name="deepseek-reasoner",
+        temperature=0.8
     )
+
+    # llm = utils.get_llm_model(
+    #     provider="ollama", model_name="qwen2.5:7b", temperature=0.5
+    # )
 
     controller = CustomController()
     use_own_browser = False

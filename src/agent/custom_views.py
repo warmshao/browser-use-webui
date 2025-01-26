@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/2
-# @Author  : wenshao
-# @ProjectName: browser-use-webui
-# @FileName: custom_views.py
-
 from dataclasses import dataclass
 from typing import Type
 
@@ -20,6 +14,7 @@ class CustomAgentStepInfo:
     add_infos: str
     memory: str
     task_progress: str
+    future_plans: str
 
 
 class CustomAgentBrain(BaseModel):
@@ -27,7 +22,8 @@ class CustomAgentBrain(BaseModel):
 
     prev_action_evaluation: str
     important_contents: str
-    completed_contents: str
+    task_progress: str
+    future_plans: str
     thought: str
     summary: str
 

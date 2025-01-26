@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/1
-# @Author  : wenshao
-# @Email   : wenshaoguo1026@gmail.com
-# @Project : browser-use-webui
-# @FileName: context.py
-
 import json
 import logging
 import os
@@ -14,7 +7,6 @@ from browser_use.browser.context import BrowserContext, BrowserContextConfig
 from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext as PlaywrightBrowserContext
 
-from .config import BrowserPersistenceConfig
 logger = logging.getLogger(__name__)
 
 

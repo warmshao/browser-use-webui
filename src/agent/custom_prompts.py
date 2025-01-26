@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/2
-# @Author  : wenshao
-# @ProjectName: browser-use-webui
-# @FileName: custom_prompts.py
-
+import pdb
 from typing import List, Optional
 
 from browser_use.agent.prompts import SystemPrompt
@@ -25,8 +20,9 @@ class CustomSystemPrompt(SystemPrompt):
          "current_state": {
            "prev_action_evaluation": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Ignore the action result. The website is the ground truth. Also mention if something unexpected happened like new suggestions in an input field. Shortly state why/why not. Note that the result you output must be consistent with the reasoning you output afterwards. If you consider it to be 'Failed,' you should reflect on this during your thought.",
            "important_contents": "Output important contents closely related to user\'s instruction or task on the current page. If there is, please output the contents. If not, please output empty string ''.",
-           "completed_contents": "Update the input Task Progress. Completed contents is a general summary of the current contents that have been completed. Just summarize the contents that have been actually completed based on the current page and the history operations. Please list each completed item individually, such as: 1. Input username. 2. Input Password. 3. Click confirm button",
-           "thought": "Think about the requirements that have been completed in previous operations and the requirements that need to be completed in the next one operation. If the output of prev_action_evaluation is 'Failed', please reflect and output your reflection here. If you think you have entered the wrong page, consider to go back to the previous page in next action.",
+           "task_progress": "Task Progress is a general summary of the current contents that have been completed. Just summarize the contents that have been actually completed based on the content at current step and the history operations. Please list each completed item individually, such as: 1. Input username. 2. Input Password. 3. Click confirm button. Please return string type not a list.",
+           "future_plans": "Based on the user's request and the current state, outline the remaining steps needed to complete the task. This should be a concise list of actions yet to be performed, such as: 1. Select a date. 2. Choose a specific time slot. 3. Confirm booking. Please return string type not a list.",
+           "thought": "Think about the requirements that have been completed in previous operations and the requirements that need to be completed in the next one operation. If your output of prev_action_evaluation is 'Failed', please reflect and output your reflection here.",
            "summary": "Please generate a brief natural language description for the operation in next actions based on your Thought."
          },
          "action": [
@@ -70,6 +66,7 @@ class CustomSystemPrompt(SystemPrompt):
        - Don't hallucinate actions.
        - If the task requires specific information - make sure to include everything in the done function. This is what the user will see.
        - If you are running out of steps (current step), think about speeding it up, and ALWAYS use the done action as the last action.
+       - Note that you must verify if you've truly fulfilled the user's request by examining the actual page content, not just by looking at the actions you output but also whether the action is executed successfully. Pay particular attention when errors occur during action execution.
 
     6. VISUAL CONTEXT:
        - When an image is provided, use it to understand the page layout
@@ -100,10 +97,9 @@ class CustomSystemPrompt(SystemPrompt):
     1. Task: The user\'s instructions you need to complete.
     2. Hints(Optional): Some hints to help you complete the user\'s instructions.
     3. Memory: Important contents are recorded during historical operations for use in subsequent operations.
-    4. Task Progress: Up to the current page, the content you have completed can be understood as the progress of the task.
-    5. Current URL: The webpage you're currently on
-    6. Available Tabs: List of open browser tabs
-    7. Interactive Elements: List in the format:
+    4. Current URL: The webpage you're currently on
+    5. Available Tabs: List of open browser tabs
+    6. Interactive Elements: List in the format:
        index[:]<element_type>element_text</element_type>
        - index: Numeric identifier for interaction
        - element_type: HTML element type (button, input, etc.)
@@ -162,20 +158,27 @@ class CustomAgentMessagePrompt:
         self.step_info = step_info
 
     def get_user_message(self) -> HumanMessage:
+        if self.step_info:
+            step_info_description = f'Current step: {self.step_info.step_number + 1}/{self.step_info.max_steps}'
+        else:
+            step_info_description = ''
+
+        elements_text = self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
+        if not elements_text:
+            elements_text = 'empty page'
         state_description = f"""
-    1. Task: {self.step_info.task}
-    2. Hints(Optional): 
-    {self.step_info.add_infos}
-    3. Memory: 
-    {self.step_info.memory}
-    4. Task Progress: 
-    {self.step_info.task_progress}
-    5. Current url: {self.state.url}
-    6. Available tabs:
-    {self.state.tabs}
-    7. Interactive elements:
-    {self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)}
-            """
+{step_info_description}
+1. Task: {self.step_info.task}
+2. Hints(Optional): 
+{self.step_info.add_infos}
+3. Memory: 
+{self.step_info.memory}
+4. Current url: {self.state.url}
+5. Available tabs:
+{self.state.tabs}
+6. Interactive elements:
+{elements_text}
+        """
 
         if self.result:
             for i, result in enumerate(self.result):

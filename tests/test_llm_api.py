@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/1
-# @Author  : wenshao
-# @Email   : wenshaoguo1026@gmail.com
-# @Project : browser-use-webui
-# @FileName: test_llm_api.py
 import os
 import pdb
 
@@ -114,6 +108,33 @@ def test_deepseek_model():
     ai_msg = llm.invoke([message])
     print(ai_msg.content)
 
+def test_deepseek_r1_model():
+    from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+    from src.utils import utils
+
+    llm = utils.get_llm_model(
+        provider="deepseek",
+        model_name="deepseek-reasoner",
+        temperature=0.8,
+        base_url=os.getenv("DEEPSEEK_ENDPOINT", ""),
+        api_key=os.getenv("DEEPSEEK_API_KEY", "")
+    )
+    messages = []
+    sys_message = SystemMessage(
+        content=[{"type": "text", "text": "you are a helpful AI assistant"}]
+    )
+    messages.append(sys_message)
+    user_message = HumanMessage(
+        content=[
+            {"type": "text", "text": "9.11 and 9.8, which is greater?"}
+        ]
+    )
+    messages.append(user_message)
+    ai_msg = llm.invoke(messages)
+    print(ai_msg.reasoning_content)
+    print(ai_msg.content)
+    print(llm.model_name)
+    pdb.set_trace()
 
 def test_ollama_model():
     from langchain_ollama import ChatOllama
@@ -128,4 +149,5 @@ if __name__ == '__main__':
     # test_gemini_model()
     # test_azure_openai_model()
     # test_deepseek_model()
-    test_ollama_model()
+    # test_ollama_model()
+    test_deepseek_r1_model()

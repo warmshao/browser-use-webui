@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/2
-# @Author  : wenshao
-# @ProjectName: browser-use-webui
-# @FileName: custom_action.py
-
 import pyperclip
 from browser_use.agent.views import ActionResult
 from browser_use.browser.context import BrowserContext
