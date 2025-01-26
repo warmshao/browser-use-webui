@@ -1,0 +1,70 @@
+[project]
+name = "browser-use-web-ui"
+version = "0.1.0"
+description = "A web intefrace for browser use"
+authors = [{name = "Browser Use"}]
+requires-python = ">= 3.11, < 3.12"
+readme = "README.md"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [ "python-dotenv>=1.0.1,<2", "browser-use>=0.1.19,<0.1.20", "langchain-google-genai>=2.0.8,<3", "gradio>=5.13.1,<6", "langchain-ollama>=0.2.2,<0.3", "langchain-openai>=0.3.1,<0.4", "pytz>=2024.2,<2025", "importlib-metadata>=8.5.0,<9", "pyperclip==1.9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/browser-use/web-ui"
+Repository = "https://github.com/browser-use/web-ui.git"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.pixi.pypi-dependencies]
+browser-use-web-ui = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+test = "pytest tests/"
+lint = "ruff check ."
+format = "ruff format ."
+docs = "cd docs; quarto render"
+mkdocs = "mkdocs serve"
+webui = "python -m webui --ip 127.0.0.1 --port 7788"
+install-cli = "pip install -e ."
+install-quarto-extensions = '''
+cd docs;
+quarto add quarto-ext/fontawesome;
+quarto install extension grantmcdermott/quarto-revealjs-clean;
+quarto install extension mikemahoney218/quarto-arxiv;
+quarto install tinytex;
+'''
+
+[tool.pixi.dependencies]
+pytest = ">=8.3.4,<9"
+pytest-cov = ">=6.0.0,<7"
+pytest-mock = ">=3.14.0,<4"
+typer = ">=0.15.1,<0.16"
+typing = ">=3.10.0.0,<4"
+quarto = ">=1.6.40,<2"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -q"
+markers = ["integration: marks tests as integration tests that require real credentials"]
+
+[tool.ruff]
+select = ["E", "F", "I", "N", "W", "B", "UP"]
+line-length = 100
