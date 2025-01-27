@@ -11,7 +11,7 @@ This project builds upon the foundation of the [browser-use](https://github.com/
 
 We would like to officially thank [WarmShao](https://github.com/warmshao) for his contribution to this project.
 
-**WebUI:** is built on Gradio and supports a most of `browser-use` functionalities. This UI is designed to be user-friendly and enables easy interaction with the browser agent.
+**WebUI:** is built on Gradio and supports most of `browser-use` functionalities. This UI is designed to be user-friendly and enables easy interaction with the browser agent.
 
 **Expanded LLM Support:** We've integrated support for various Large Language Models (LLMs), including: Gemini, OpenAI, Azure OpenAI, Anthropic, DeepSeek, Ollama etc. And we plan to add support for even more models in the future.
 
