@@ -21,6 +21,8 @@ from browser_use.browser.context import (
     BrowserContextConfig,
     BrowserContextWindowSize,
 )
+from langchain_ollama import ChatOllama
+from playwright.async_api import async_playwright
 from src.utils.agent_state import AgentState
 
 from src.utils import utils
@@ -91,7 +93,7 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_calling_method
 ):
     global _global_agent_state
     _global_agent_state.clear_stop()  # Clear any previous stop requests
@@ -137,7 +139,7 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_call_in_content=tool_call_in_content
+                tool_calling_method=tool_calling_method
             )
         elif agent_type == "custom":
             final_result, errors, model_actions, model_thoughts, trace_file, history_file = await run_custom_agent(
@@ -156,7 +158,7 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_call_in_content=tool_call_in_content
+                tool_calling_method=tool_calling_method
             )
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
@@ -215,7 +217,7 @@ async def run_org_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_calling_method
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state
@@ -251,7 +253,7 @@ async def run_org_agent(
                     ),
                 )
             )
-
+            
         agent = Agent(
             task=task,
             llm=llm,
@@ -259,7 +261,7 @@ async def run_org_agent(
             browser=_global_browser,
             browser_context=_global_browser_context,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content
+            tool_calling_method=tool_calling_method
         )
         history = await agent.run(max_steps=max_steps)
 
@@ -306,7 +308,7 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_call_in_content
+        tool_calling_method
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state
@@ -345,7 +347,7 @@ async def run_custom_agent(
                     ),
                 )
             )
-
+            
         # Create and run agent
         agent = CustomAgent(
             task=task,
@@ -357,8 +359,8 @@ async def run_custom_agent(
             controller=controller,
             system_prompt_class=CustomSystemPrompt,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
-            agent_state=_global_agent_state
+            agent_state=_global_agent_state,
+            tool_calling_method=tool_calling_method
         )
         history = await agent.run(max_steps=max_steps)
 
@@ -411,7 +413,7 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_call_in_content,
+    tool_calling_method,
     rag_file=None,
 ):
     global _global_agent_state
@@ -463,7 +465,7 @@ async def run_with_stream(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content
+            tool_calling_method=tool_calling_method
         )
         # Add HTML content at the start of the result array
         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
@@ -495,7 +497,7 @@ async def run_with_stream(
                     max_steps=max_steps,
                     use_vision=use_vision,
                     max_actions_per_step=max_actions_per_step,
-                    tool_call_in_content=tool_call_in_content
+                    tool_calling_method=tool_calling_method
                 )
             )
 
@@ -651,32 +653,38 @@ def create_ui(config, theme_name="Ocean"):
                         value=config['agent_type'],
                         info="Select the type of agent to use",
                     )
-                    max_steps = gr.Slider(
-                        minimum=1,
-                        maximum=200,
-                        value=config['max_steps'],
-                        step=1,
-                        label="Max Run Steps",
-                        info="Maximum number of steps the agent will take",
-                    )
-                    max_actions_per_step = gr.Slider(
-                        minimum=1,
-                        maximum=20,
-                        value=config['max_actions_per_step'],
-                        step=1,
-                        label="Max Actions per Step",
-                        info="Maximum number of actions the agent will take per step",
-                    )
-                    use_vision = gr.Checkbox(
-                        label="Use Vision",
-                        value=config['use_vision'],
-                        info="Enable visual processing capabilities",
-                    )
-                    tool_call_in_content = gr.Checkbox(
-                        label="Use Tool Calls in Content",
-                        value=config['tool_call_in_content'],
-                        info="Enable Tool Calls in content",
-                    )
+                    with gr.Column():
+                        max_steps = gr.Slider(
+                            minimum=1,
+                            maximum=200,
+                            value=config['max_steps'],
+                            step=1,
+                            label="Max Run Steps",
+                            info="Maximum number of steps the agent will take",
+                        )
+                        max_actions_per_step = gr.Slider(
+                            minimum=1,
+                            maximum=20,
+                            value=config['max_actions_per_step'],
+                            step=1,
+                            label="Max Actions per Step",
+                            info="Maximum number of actions the agent will take per step",
+                        )
+                    with gr.Column():
+                        use_vision = gr.Checkbox(
+                            label="Use Vision",
+                            value=config['use_vision'],
+                            info="Enable visual processing capabilities",
+                        )
+                        tool_calling_method = gr.Dropdown(
+                            label="Tool Calling Method",
+                            value=config['tool_calling_method'],
+                            interactive=True,
+                            allow_custom_value=True,  # Allow users to input custom model names
+                            choices=["auto", "json_schema", "function_calling"],
+                            info="Tool Calls Funtion Name",
+                            visible=False
+                        )
 
             with gr.TabItem("🔧 LLM Configuration", id=2):
                 with gr.Group():
@@ -834,7 +842,7 @@ def create_ui(config, theme_name="Ocean"):
                     fn=update_ui_from_config,
                     inputs=[config_file_input],
                     outputs=[
-                        agent_type, max_steps, max_actions_per_step, use_vision, tool_call_in_content,
+                        agent_type, max_steps, max_actions_per_step, use_vision, tool_calling_method,
                         llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                         use_own_browser, keep_browser_open, headless, disable_security, enable_recording,
                         window_w, window_h, save_recording_path, save_trace_path, save_agent_history_path,
@@ -845,7 +853,7 @@ def create_ui(config, theme_name="Ocean"):
                 save_config_button.click(
                     fn=save_current_config,
                     inputs=[
-                        agent_type, max_steps, max_actions_per_step, use_vision, tool_call_in_content,
+                        agent_type, max_steps, max_actions_per_step, use_vision, tool_calling_method,
                         llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                         use_own_browser, keep_browser_open, headless, disable_security,
                         enable_recording, window_w, window_h, save_recording_path, save_trace_path,
@@ -897,7 +905,7 @@ def create_ui(config, theme_name="Ocean"):
                             agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                             use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                             save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_call_in_content, rag_file,
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, rag_file,
                         ],
                     outputs=[
                         browser_view,           # Browser view

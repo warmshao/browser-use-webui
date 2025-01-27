@@ -1,9 +1,6 @@
-browser-use==0.1.19
-langchain-google-genai==2.0.8
+browser-use==0.1.29
 pyperclip==1.9.0
-gradio==5.9.1
-langchain-ollama==0.2.2
-langchain-openai==0.2.14
+gradio==5.10.0
 langchain-community==0.3.15
 faiss-cpu==1.9.0
 python-docx==1.1.2

@@ -45,7 +45,7 @@ class CustomAgentOutput(AgentOutput):
     ) -> Type["CustomAgentOutput"]:
         """Extend actions with custom actions"""
         return create_model(
-            "AgentOutput",
+            "CustomAgentOutput",
             __base__=CustomAgentOutput,
             action=(
                 list[custom_actions],

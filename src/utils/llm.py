@@ -25,6 +25,7 @@ from langchain_core.outputs import (
     LLMResult,
     RunInfo,
 )
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers.base import OutputParserLike
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
@@ -98,4 +99,38 @@ class DeepSeekR1ChatOpenAI(ChatOpenAI):
 
         reasoning_content = response.choices[0].message.reasoning_content
         content = response.choices[0].message.content
+        return AIMessage(content=content, reasoning_content=reasoning_content)
+    
+class DeepSeekR1ChatOllama(ChatOllama):
+        
+    async def ainvoke(
+        self,
+        input: LanguageModelInput,
+        config: Optional[RunnableConfig] = None,
+        *,
+        stop: Optional[list[str]] = None,
+        **kwargs: Any,
+    ) -> AIMessage:
+        org_ai_message = await super().ainvoke(input=input)
+        org_content = org_ai_message.content
+        reasoning_content = org_content.split("</think>")[0].replace("<think>", "")
+        content = org_content.split("</think>")[1]
+        if "**JSON Response:**" in content:
+            content = content.split("**JSON Response:**")[-1]
+        return AIMessage(content=content, reasoning_content=reasoning_content)
+    
+    def invoke(
+        self,
+        input: LanguageModelInput,
+        config: Optional[RunnableConfig] = None,
+        *,
+        stop: Optional[list[str]] = None,
+        **kwargs: Any,
+    ) -> AIMessage:
+        org_ai_message = super().invoke(input=input)
+        org_content = org_ai_message.content
+        reasoning_content = org_content.split("</think>")[0].replace("<think>", "")
+        content = org_content.split("</think>")[1]
+        if "**JSON Response:**" in content:
+            content = content.split("**JSON Response:**")[-1]
         return AIMessage(content=content, reasoning_content=reasoning_content)
