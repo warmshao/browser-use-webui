@@ -3,6 +3,7 @@ import logging
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
 import os
 import glob
@@ -15,7 +16,6 @@ logger = logging.getLogger(__name__)
 import gradio as gr
 
 from browser_use.agent.service import Agent
-from playwright.async_api import async_playwright
 from browser_use.browser.browser import Browser, BrowserConfig
 from browser_use.browser.context import (
     BrowserContextConfig,
@@ -26,13 +26,14 @@ from playwright.async_api import async_playwright
 from src.utils.agent_state import AgentState
 
 from src.utils import utils
+from src.utils.RAG_interaction import extract_content_from_file
 from src.agent.custom_agent import CustomAgent
 from src.browser.custom_browser import CustomBrowser
 from src.agent.custom_prompts import CustomSystemPrompt
 from src.browser.custom_context import BrowserContextConfig, CustomBrowserContext
 from src.controller.custom_controller import CustomController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
-from src.utils.default_config_settings import default_config, load_config_from_file, save_config_to_file, save_current_config, update_ui_from_config
+from src.utils.default_config_settings import default_config, save_current_config, update_ui_from_config
 from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
 
 
@@ -412,11 +413,35 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    rag_file=None,
 ):
     global _global_agent_state
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
+
+    # RAG Logic
+    if rag_file:
+        content = extract_content_from_file(rag_file.name)
+
+        if content.strip():
+            from langchain.vectorstores import FAISS
+            from langchain.docstore.document import Document
+            from langchain.embeddings.openai import OpenAIEmbeddings
+
+            # Embed the document and retrieve context
+            doc = Document(page_content=content)
+            embeddings = OpenAIEmbeddings()
+            vector_store = FAISS.from_documents([doc], embeddings)
+            retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+
+            # Retrieve relevant documents
+            retrieved_documents = retriever.get_relevant_documents(task)
+            retrieved_context = "\n".join([doc.page_content for doc in retrieved_documents])
+
+            # Prepend retrieved context to the task
+            task = f"Context: {retrieved_context}\nTask: {task}"
+
     if not headless:
         result = await run_browser_agent(
             agent_type=agent_type,
@@ -480,7 +505,6 @@ async def run_with_stream(
             html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
             final_result = errors = model_actions = model_thoughts = ""
             latest_videos = trace = history_file = None
-
 
             # Periodically update the stream while the agent task is running
             while not agent_task.done():
@@ -779,6 +803,14 @@ def create_ui(config, theme_name="Ocean"):
                     info="Optional hints to help the LLM complete the task",
                 )
 
+                rag_file = gr.File(
+                    label="RAG File",
+                    file_types=[
+                        ".pdf", ".txt", ".docx", ".rtf", ".jpg", ".jpeg", ".png", ".xlsx", ".xls",
+                    ],
+                    interactive=True,
+                )
+
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
@@ -873,7 +905,7 @@ def create_ui(config, theme_name="Ocean"):
                             agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                             use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                             save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, rag_file,
                         ],
                     outputs=[
                         browser_view,           # Browser view
