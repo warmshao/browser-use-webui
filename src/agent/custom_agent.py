@@ -2,6 +2,7 @@ import json
 import logging
 import pdb
 import traceback
+
 from typing import Optional, Type, List, Dict, Any, Callable
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -30,12 +31,16 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     BaseMessage,
 )
+from src.utils.utils import remove_think_tags
 from src.utils.agent_state import AgentState
 
 from .custom_massage_manager import CustomMassageManager
 from .custom_views import CustomAgentOutput, CustomAgentStepInfo
 
 logger = logging.getLogger(__name__)
+import re
+
+
 
 
 class CustomAgent(Agent):
@@ -175,8 +180,44 @@ class CustomAgent(Agent):
         if future_plans and "None" not in future_plans:
             step_info.future_plans = future_plans
 
-    @time_execution_async("--get_next_action")
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
+        try:
+            # Try using your LLM with structured output first
+            structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
+            response = await structured_llm.ainvoke(input_messages)
+
+            # If the structured parse succeeds, we can just use the 'parsed' object
+            parsed: AgentOutput = response['parsed']
+            # cut the number of actions to max_actions_per_step
+            parsed.action = parsed.action[: self.max_actions_per_step]
+            self._log_response(CustomAgentOutput(**parsed.dict()))
+            self.n_steps += 1
+
+            return parsed
+
+        except Exception:
+            # If the structured parse failed or something went wrong, fallback to manual JSON parsing
+            ret = self.llm.invoke(input_messages)
+            
+            # 1) Extract the raw text
+            if isinstance(ret.content, list):
+                text = ret.content[0]
+            else:
+                text = ret.content
+            
+            # 2) Remove <think>...</think> or any other undesired tags
+            if isinstance(text, str):
+                text = remove_think_tags(text)
+            
+            # 3) Clean up triple backticks, etc. 
+            text = text.replace("```json", "").replace("```", "")
+
+            # 4) Now do a manual parse
+            parsed_json = json.loads(text)
+            parsed: AgentOutput = self.AgentOutput(**parsed_json)
+            if parsed is None:
+                raise ValueError('Could not parse response into AgentOutput.')
+
         """Get next action from LLM based on current state"""
         if self.use_deepseek_r1:
             merged_input_messages = self.message_manager.merge_successive_human_messages(input_messages)
@@ -196,14 +237,6 @@ class CustomAgent(Agent):
         else:
             ai_message = self.llm.invoke(input_messages)
             self.message_manager._add_message_with_tokens(ai_message)
-            if isinstance(ai_message.content, list):
-                parsed_json = json.loads(ai_message.content[0].replace("```json", "").replace("```", ""))
-            else:
-                parsed_json = json.loads(ai_message.content.replace("```json", "").replace("```", ""))
-            parsed: AgentOutput = self.AgentOutput(**parsed_json)
-            if parsed is None:
-                logger.debug(ai_message.content)
-                raise ValueError(f'Could not parse response.')
 
         # cut the number of actions to max_actions_per_step
         parsed.action = parsed.action[: self.max_actions_per_step]

@@ -1,6 +1,7 @@
 import base64
 import os
 import time
+import re
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -218,3 +219,10 @@ async def capture_screenshot(browser_context):
         return encoded
     except Exception as e:
         return None
+def remove_think_tags(text: str) -> str:
+    """
+    Removes <think>...</think> segments from the raw text 
+    so that JSON parsing won't be broken by the extra content.
+    """
+    # DOTALL allows '.' to match newlines
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
