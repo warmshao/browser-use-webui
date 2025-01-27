@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/1
-# @Author  : wenshao
-# @Email   : wenshaoguo1026@gmail.com
-# @Project : browser-use-webui
-# @FileName: utils.py
 import base64
 import os
 import time
@@ -16,6 +10,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 import gradio as gr
+
+from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
 
 def get_llm_model(provider: str, **kwargs):
     """
@@ -69,12 +65,20 @@ def get_llm_model(provider: str, **kwargs):
         else:
             api_key = kwargs.get("api_key")
 
-        return ChatOpenAI(
-            model=kwargs.get("model_name", "deepseek-chat"),
-            temperature=kwargs.get("temperature", 0.0),
-            base_url=base_url,
-            api_key=api_key,
-        )
+        if kwargs.get("model_name", "deepseek-chat") == "deepseek-reasoner":
+            return DeepSeekR1ChatOpenAI(
+                model=kwargs.get("model_name", "deepseek-reasoner"),
+                temperature=kwargs.get("temperature", 0.0),
+                base_url=base_url,
+                api_key=api_key,
+            )
+        else:
+            return ChatOpenAI(
+                model=kwargs.get("model_name", "deepseek-chat"),
+                temperature=kwargs.get("temperature", 0.0),
+                base_url=base_url,
+                api_key=api_key,
+            )
     elif provider == "gemini":
         if not kwargs.get("api_key", ""):
             api_key = os.getenv("GOOGLE_API_KEY", "")
@@ -86,12 +90,25 @@ def get_llm_model(provider: str, **kwargs):
             google_api_key=api_key,
         )
     elif provider == "ollama":
-        return ChatOllama(
-            model=kwargs.get("model_name", "qwen2.5:7b"),
-            temperature=kwargs.get("temperature", 0.0),
-            num_ctx=kwargs.get("num_ctx", 32000),
-            base_url=kwargs.get("base_url", "http://localhost:11434"),
-        )
+        if not kwargs.get("base_url", ""):
+            base_url = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
+        else:
+            base_url = kwargs.get("base_url")
+            
+        if kwargs.get("model_name", "qwen2.5:7b").startswith("deepseek-r1"):
+            return DeepSeekR1ChatOllama(
+                model=kwargs.get("model_name", "deepseek-r1:7b"),
+                temperature=kwargs.get("temperature", 0.0),
+                num_ctx=kwargs.get("num_ctx", 32000),
+                base_url=kwargs.get("base_url", base_url),
+            )
+        else:
+            return ChatOllama(
+                model=kwargs.get("model_name", "qwen2.5:7b"),
+                temperature=kwargs.get("temperature", 0.0),
+                num_ctx=kwargs.get("num_ctx", 32000),
+                base_url=kwargs.get("base_url", base_url),
+            )
     elif provider == "azure_openai":
         if not kwargs.get("base_url", ""):
             base_url = os.getenv("AZURE_OPENAI_ENDPOINT", "")
@@ -115,9 +132,9 @@ def get_llm_model(provider: str, **kwargs):
 model_names = {
     "anthropic": ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
     "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
-    "deepseek": ["deepseek-chat"],
+    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
     "gemini": ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-1219" ],
-    "ollama": ["qwen2.5:7b", "llama2:7b"],
+    "ollama": ["qwen2.5:7b", "llama2:7b", "deepseek-r1:14b", "deepseek-r1:32b"],
     "azure_openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"]
 }
 

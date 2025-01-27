@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2025/1/2
-# @Author  : wenshao
-# @ProjectName: browser-use-webui
-# @FileName: custom_massage_manager.py
-
 from __future__ import annotations
 
 import logging
@@ -15,11 +9,16 @@ from browser_use.agent.prompts import SystemPrompt
 from browser_use.agent.views import ActionResult, AgentStepInfo
 from browser_use.browser.views import BrowserState
 from langchain_core.language_models import BaseChatModel
+from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
-    HumanMessage,
-    AIMessage
+	AIMessage,
+	BaseMessage,
+	HumanMessage,
+    ToolMessage
 )
-
+from langchain_openai import ChatOpenAI
+from ..utils.llm import DeepSeekR1ChatOpenAI
 from .custom_prompts import CustomAgentMessagePrompt
 
 logger = logging.getLogger(__name__)
@@ -33,12 +32,13 @@ class CustomMassageManager(MessageManager):
             action_descriptions: str,
             system_prompt_class: Type[SystemPrompt],
             max_input_tokens: int = 128000,
-            estimated_tokens_per_character: int = 3,
+            estimated_characters_per_token: int = 3,
             image_tokens: int = 800,
             include_attributes: list[str] = [],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
-            tool_call_in_content: bool = False,
+            message_context: Optional[str] = None,
+            use_deepseek_r1: bool = False
     ):
         super().__init__(
             llm=llm,
@@ -46,48 +46,32 @@ class CustomMassageManager(MessageManager):
             action_descriptions=action_descriptions,
             system_prompt_class=system_prompt_class,
             max_input_tokens=max_input_tokens,
-            estimated_tokens_per_character=estimated_tokens_per_character,
+            estimated_characters_per_token=estimated_characters_per_token,
             image_tokens=image_tokens,
             include_attributes=include_attributes,
             max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
-            tool_call_in_content=tool_call_in_content,
+            message_context=message_context
         )
-
+        self.tool_id = 1
+        self.use_deepseek_r1 = use_deepseek_r1
         # Custom: Move Task info to state_message
         self.history = MessageHistory()
         self._add_message_with_tokens(self.system_prompt)
-        tool_calls = [
-            {
-                'name': 'CustomAgentOutput',
-                'args': {
-                    'current_state': {
-                        'prev_action_evaluation': 'Unknown - No previous actions to evaluate.',
-                        'important_contents': '',
-                        'completed_contents': '',
-                        'thought': 'Now Google is open. Need to type OpenAI to search.',
-                        'summary': 'Type OpenAI to search.',
-                    },
-                    'action': [],
-                },
-                'id': '',
-                'type': 'tool_call',
-            }
-        ]
-        if self.tool_call_in_content:
-            # openai throws error if tool_calls are not responded -> move to content
-            example_tool_call = AIMessage(
-                content=f'{tool_calls}',
-                tool_calls=[],
-            )
-        else:
-            example_tool_call = AIMessage(
-                content=f'',
-                tool_calls=tool_calls,
-            )
+        
+        if self.message_context:
+            context_message = HumanMessage(content=self.message_context)
+            self._add_message_with_tokens(context_message)
 
-        self._add_message_with_tokens(example_tool_call)
-
+    def cut_messages(self):
+        """Get current message list, potentially trimmed to max tokens"""
+        diff = self.history.total_tokens - self.max_input_tokens
+        min_message_len = 2 if self.message_context is not None else 1
+        
+        while diff > 0 and len(self.history.messages) > min_message_len:
+            self.history.remove_message(min_message_len) # alway remove the oldest message
+            diff = self.history.total_tokens - self.max_input_tokens
+        
     def add_state_message(
             self,
             state: BrowserState,
@@ -95,21 +79,6 @@ class CustomMassageManager(MessageManager):
             step_info: Optional[AgentStepInfo] = None,
     ) -> None:
         """Add browser state as human message"""
-
-        # if keep in memory, add to directly to history and add state without result
-        if result:
-            for r in result:
-                if r.include_in_memory:
-                    if r.extracted_content:
-                        msg = HumanMessage(content=str(r.extracted_content))
-                        self._add_message_with_tokens(msg)
-                    if r.error:
-                        msg = HumanMessage(
-                            content=str(r.error)[-self.max_error_length:]
-                        )
-                        self._add_message_with_tokens(msg)
-                    result = None  # if result in history, we dont want to add it again
-
         # otherwise add state message and result to next message (which will not stay in memory)
         state_message = CustomAgentMessagePrompt(
             state,
@@ -119,3 +88,17 @@ class CustomMassageManager(MessageManager):
             step_info=step_info,
         ).get_user_message()
         self._add_message_with_tokens(state_message)
+    
+    def _count_text_tokens(self, text: str) -> int:
+        if isinstance(self.llm, (ChatOpenAI, ChatAnthropic, DeepSeekR1ChatOpenAI)):
+            try:
+                tokens = self.llm.get_num_tokens(text)
+            except Exception:
+                tokens = (
+					len(text) // self.estimated_characters_per_token
+				)  # Rough estimate if no tokenizer available
+        else:
+            tokens = (
+				len(text) // self.estimated_characters_per_token
+			)  # Rough estimate if no tokenizer available
+        return tokens
