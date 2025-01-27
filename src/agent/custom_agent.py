@@ -3,7 +3,11 @@ import logging
 import pdb
 import traceback
 <<<<<<< HEAD
+<<<<<<< HEAD
 from typing import Optional, Type, Any
+=======
+from typing import Optional, Type, List, Dict, Any, Callable
+>>>>>>> main
 =======
 from typing import Optional, Type, List, Dict, Any, Callable
 >>>>>>> main
@@ -185,6 +189,7 @@ class CustomAgent(Agent):
 
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
 <<<<<<< HEAD
+<<<<<<< HEAD
         try:
             # Try using your LLM with structured output first
             structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
@@ -230,6 +235,27 @@ class CustomAgent(Agent):
             logger.info(f"🤯 Start Deep Thinking: ")
             logger.info(ai_message.reasoning_content)
             logger.info(f"🤯 End Deep Thinking")
+=======
+        """Get next action from LLM based on current state"""
+        if self.use_deepseek_r1:
+            merged_input_messages = self.message_manager.merge_successive_human_messages(input_messages)
+            ai_message = self.llm.invoke(merged_input_messages)
+            self.message_manager._add_message_with_tokens(ai_message)
+            logger.info(f"🤯 Start Deep Thinking: ")
+            logger.info(ai_message.reasoning_content)
+            logger.info(f"🤯 End Deep Thinking")
+            if isinstance(ai_message.content, list):
+                parsed_json = json.loads(ai_message.content[0].replace("```json", "").replace("```", ""))
+            else:
+                parsed_json = json.loads(ai_message.content.replace("```json", "").replace("```", ""))
+            parsed: AgentOutput = self.AgentOutput(**parsed_json)
+            if parsed is None:
+                logger.debug(ai_message.content)
+                raise ValueError(f'Could not parse response.')
+        else:
+            ai_message = self.llm.invoke(input_messages)
+            self.message_manager._add_message_with_tokens(ai_message)
+>>>>>>> main
             if isinstance(ai_message.content, list):
                 parsed_json = json.loads(ai_message.content[0].replace("```json", "").replace("```", ""))
             else:
