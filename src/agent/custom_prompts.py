@@ -1,5 +1,4 @@
 import pdb
-from typing import List, Optional
 
 from browser_use.agent.prompts import SystemPrompt, AgentMessagePrompt
 from browser_use.agent.views import ActionResult, ActionModel
@@ -140,11 +139,11 @@ class CustomAgentMessagePrompt(AgentMessagePrompt):
     def __init__(
             self,
             state: BrowserState,
-            actions: Optional[List[ActionModel]] = None,
-            result: Optional[List[ActionResult]] = None,
+            actions: list[ActionModel] | None = None,
+            result: list[ActionResult] | None = None,
             include_attributes: list[str] = [],
             max_error_length: int = 400,
-            step_info: Optional[CustomAgentStepInfo] = None,
+            step_info: CustomAgentStepInfo | None = None,
     ):
         super(CustomAgentMessagePrompt, self).__init__(state=state, 
                                                        result=result, 
