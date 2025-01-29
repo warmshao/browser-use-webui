@@ -2,7 +2,8 @@ import json
 import logging
 import pdb
 import traceback
-from typing import Optional, Type, List, Dict, Any, Callable
+import asyncio
+from typing import Optional, Type, List, Dict, Any, Callable, Union
 from PIL import Image, ImageDraw, ImageFont
 import os
 import base64
@@ -16,15 +17,16 @@ from browser_use.agent.views import (
     AgentHistoryList,
     AgentOutput,
     AgentHistory,
+    AgentStepInfo,
 )
 from browser_use.browser.browser import Browser
 from browser_use.browser.context import BrowserContext
-from browser_use.browser.views import BrowserStateHistory
+from browser_use.browser.views import BrowserStateHistory, BrowserState
 from browser_use.controller.service import Controller
 from browser_use.telemetry.views import (
-	AgentEndTelemetryEvent,
-	AgentRunTelemetryEvent,
-	AgentStepTelemetryEvent,
+    AgentEndTelemetryEvent,
+    AgentRunTelemetryEvent,
+    AgentStepTelemetryEvent,
 )
 from browser_use.utils import time_execution_async
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -72,7 +74,7 @@ class CustomAgent(Agent):
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
             tool_call_in_content: bool = True,
-            agent_state: AgentState = None,
+            agent_state: Optional[AgentState] = None,
             initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
             # Cloud Callbacks
             register_new_step_callback: Callable[['BrowserState', 'AgentOutput', int], None] | None = None,
@@ -228,6 +230,20 @@ class CustomAgent(Agent):
         result: list[ActionResult] = []
 
         try:
+            # Check for pause
+            if self.agent_state:
+                while await self.agent_state.is_paused():
+                    if self.agent_state.is_stop_requested():
+                        logger.info("🛑 Stop requested while paused")
+                        return
+                    await asyncio.sleep(0.1)
+                
+                # Get any updated context
+                context = await self.agent_state.get_context()
+                if context and "user_input" in context and step_info is not None:
+                    step_info.add_infos = context["user_input"]
+                    logger.info(f"📝 Updated context: {context['user_input']}")
+
             state = await self.browser_context.get_state(use_vision=self.use_vision)
             self.message_manager.add_state_message(state, self._last_actions, self._last_result, step_info)
             input_messages = self.message_manager.get_messages()
@@ -235,8 +251,9 @@ class CustomAgent(Agent):
                 model_output = await self.get_next_action(input_messages)
                 if self.register_new_step_callback:
                     self.register_new_step_callback(state, model_output, self.n_steps)
-                self.update_step_info(model_output, step_info)
-                logger.info(f"🧠 All Memory: \n{step_info.memory}")
+                if step_info is not None:
+                    self.update_step_info(model_output, step_info)
+                    logger.info(f"🧠 All Memory: \n{step_info.memory}")
                 self._save_conversation(input_messages, model_output)
                 if self.model_name != "deepseek-reasoner":
                     # remove prev message

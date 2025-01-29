@@ -34,6 +34,7 @@ from src.controller.custom_controller import CustomController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
 from src.utils.default_config_settings import default_config, load_config_from_file, save_config_to_file, save_current_config, update_ui_from_config
 from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
+from src.utils.interactive_execution import execute_with_interaction
 
 
 # Global variables for persistence
@@ -95,7 +96,7 @@ async def run_browser_agent(
         tool_calling_method
 ):
     global _global_agent_state
-    _global_agent_state.clear_stop()  # Clear any previous stop requests
+    _global_agent_state.clear_stop()
 
     try:
         # Disable recording if the checkbox is unchecked
@@ -427,7 +428,9 @@ async def run_with_stream(
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
     if not headless:
-        result = await run_browser_agent(
+        result = await execute_with_interaction(
+            _global_agent_state,
+            run_browser_agent,
             agent_type=agent_type,
             llm_provider=llm_provider,
             llm_model_name=llm_model_name,
@@ -452,14 +455,23 @@ async def run_with_stream(
             tool_calling_method=tool_calling_method
         )
         # Add HTML content at the start of the result array
-        html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
-        yield [html_content] + list(result)
+        html_content = gr.HTML(f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>")
+        if result is None:
+            yield [html_content, "", "", "", "", None, None, None, 
+                  gr.update(value="Stop", interactive=True),
+                  gr.update(interactive=True)]
+        else:
+            final_result, errors, model_actions, model_thoughts, latest_video, trace_file, history_file, stop_button, run_button = result
+            yield [html_content, final_result, errors, model_actions, model_thoughts, 
+                  latest_video, trace_file, history_file, stop_button, run_button]
     else:
         try:
             _global_agent_state.clear_stop()
-            # Run the browser agent in the background
+            # Run the browser agent in the background with interactive execution
             agent_task = asyncio.create_task(
-                run_browser_agent(
+                execute_with_interaction(
+                    _global_agent_state,
+                    run_browser_agent,
                     agent_type=agent_type,
                     llm_provider=llm_provider,
                     llm_model_name=llm_model_name,
@@ -486,23 +498,23 @@ async def run_with_stream(
             )
 
             # Initialize values for streaming
-            html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
+            html_content = gr.HTML(f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>")
             final_result = errors = model_actions = model_thoughts = ""
             latest_videos = trace = history_file = None
-
 
             # Periodically update the stream while the agent task is running
             while not agent_task.done():
                 try:
                     encoded_screenshot = await capture_screenshot(_global_browser_context)
                     if encoded_screenshot is not None:
-                        html_content = f'<img src="data:image/jpeg;base64,{encoded_screenshot}" style="width:{stream_vw}vw; height:{stream_vh}vh ; border:1px solid #ccc;">'
+                        html_content = gr.HTML(f'<img src="data:image/jpeg;base64,{encoded_screenshot}" style="width:{stream_vw}vw; height:{stream_vh}vh ; border:1px solid #ccc;">')
                     else:
-                        html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
+                        html_content = gr.HTML(f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>")
                 except Exception as e:
-                    html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
+                    html_content = gr.HTML(f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>")
 
-                if _global_agent_state and _global_agent_state.is_stop_requested():
+                # Check for stop or pause
+                if _global_agent_state.is_stop_requested():
                     yield [
                         html_content,
                         final_result,
@@ -516,6 +528,19 @@ async def run_with_stream(
                         gr.update(interactive=False),  # run_button
                     ]
                     break
+                elif await _global_agent_state.is_paused():
+                    yield [
+                        html_content,
+                        final_result,
+                        "Agent paused - waiting for resume...",
+                        model_actions,
+                        model_thoughts,
+                        latest_videos,
+                        trace,
+                        history_file,
+                        gr.update(value="Stop", interactive=True),  # stop_button
+                        gr.update(interactive=True),  # run_button
+                    ]
                 else:
                     yield [
                         html_content,
@@ -526,10 +551,10 @@ async def run_with_stream(
                         latest_videos,
                         trace,
                         history_file,
-                        gr.update(value="Stop", interactive=True),  # Re-enable stop button
-                        gr.update(interactive=True)  # Re-enable run button
+                        gr.update(value="Stop", interactive=True),  # stop_button
+                        gr.update(interactive=True)  # run_button
                     ]
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)  # Increased sleep time for better pause responsiveness
 
             # Once the agent task completes, get the results
             try:
@@ -554,7 +579,7 @@ async def run_with_stream(
         except Exception as e:
             import traceback
             yield [
-                f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>",
+                gr.HTML(f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"),
                 "",
                 f"Error: {str(e)}\n{traceback.format_exc()}",
                 "",
@@ -562,9 +587,94 @@ async def run_with_stream(
                 None,
                 None,
                 None,
-                gr.update(value="Stop", interactive=True),  # Re-enable stop button
-                gr.update(interactive=True)    # Re-enable run button
+                gr.update(value="Stop", interactive=True),
+                gr.update(interactive=True)
             ]
+
+async def pause_agent():
+    """Pause the current agent execution"""
+    global _global_agent_state
+    await _global_agent_state.pause_execution()
+    return (
+        "Agent paused - waiting for resume",
+        gr.update(interactive=False),  # pause button
+        gr.update(interactive=True)    # resume button
+    )
+
+async def resume_agent():
+    """Resume the paused agent execution"""
+    global _global_agent_state
+    await _global_agent_state.resume_execution()
+    return (
+        "Agent resumed execution",
+        gr.update(interactive=True),   # pause button
+        gr.update(interactive=False)   # resume button
+    )
+
+async def update_agent_context(context: dict):
+    """Update the agent's context during execution"""
+    global _global_agent_state
+    await _global_agent_state.update_context(context)
+    return "Context updated successfully"
+
+async def enhance_prompt(text: str, prompt_type: str, llm_provider: str, llm_model_name: str, llm_temperature: float, llm_base_url: str, llm_api_key: str) -> str:
+    """Enhance the given prompt using the selected LLM"""
+    try:
+        # Get the LLM model
+        llm = utils.get_llm_model(
+            provider=llm_provider,
+            model_name=llm_model_name,
+            temperature=llm_temperature,
+            base_url=llm_base_url,
+            api_key=llm_api_key,
+        )
+
+        # Create system prompts based on prompt type
+        if prompt_type == "task":
+            system_prompt = """You are a helpful AI assistant that improves task descriptions for browser automation.
+Your goal is to make the task description more specific, actionable, and clear.
+Include step-by-step goals when appropriate.
+Focus on what needs to be done rather than how to do it.
+Keep the enhanced prompt concise but comprehensive.
+IMPORTANT: Return ONLY the improved prompt without any additional text, explanations, or markdown."""
+        elif prompt_type == "context":
+            system_prompt = """You are a helpful AI assistant that improves additional context for browser automation tasks.
+Your goal is to provide relevant background information and constraints that will help the agent complete the task.
+Focus on important details that might affect decision making.
+Keep the enhanced context concise but informative.
+IMPORTANT: Return ONLY the improved context without any additional text, explanations, or markdown."""
+        else:  # update context
+            system_prompt = """You are a helpful AI assistant that improves real-time updates/instructions for a browser automation agent.
+Your goal is to make the new instructions clear and actionable.
+Focus on what needs to change or what new information the agent needs to know.
+Keep the enhanced update concise and specific.
+IMPORTANT: Return ONLY the improved update without any additional text, explanations, or markdown."""
+
+        # Create the user message
+        user_message = f"Improve this {prompt_type} prompt. Remember to return ONLY the improved version:\n\n{text}"
+
+        # Get response from LLM
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+        response = await llm.ainvoke(messages)
+        
+        # Extract the improved prompt from the response
+        if isinstance(response.content, str):
+            improved_prompt = response.content.strip()
+        elif isinstance(response.content, list):
+            # If content is a list, join all text elements
+            improved_prompt = "\n".join(str(item) for item in response.content if isinstance(item, str)).strip()
+        else:
+            # If content is a dict or other type, convert to string
+            improved_prompt = str(response.content).strip()
+        
+        return improved_prompt
+
+    except Exception as e:
+        logger.error(f"Error enhancing prompt: {str(e)}")
+        return f"Error enhancing prompt: {str(e)}"
 
 # Define the theme map globally
 theme_map = {
@@ -604,6 +714,34 @@ def create_ui(config, theme_name="Ocean"):
         margin-bottom: 20px;
         padding: 15px;
         border-radius: 10px;
+    }
+    /* Updated styles for enhance buttons */
+    .enhance-button-container {
+        position: relative !important;
+        width: 100%;
+    }
+    .enhance-button-container > div:first-child {
+        width: 100%;
+    }
+    .enhance-button {
+        margin-top: 25px !important;  /* Align with textbox label */
+        height: 32px !important;     /* Match textbox input height */
+        border-radius: 8px !important;
+        background: linear-gradient(145deg, #4CAF50, #388E3C) !important;
+        font-weight: 500;
+        gap: 8px;
+    }
+    .enhance-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .enhance-button:focus {
+        outline: 2px solid #81C784;
+        outline-offset: 2px;
+    }
+    /* Remove absolute positioning and textarea padding override */
+    .enhance-button-container textarea {
+        padding-right: inherit !important;  /* Use default padding */
     }
     """
 
@@ -774,28 +912,139 @@ def create_ui(config, theme_name="Ocean"):
                     )
 
             with gr.TabItem("🤖 Run Agent", id=4):
-                task = gr.Textbox(
-                    label="Task Description",
-                    lines=4,
-                    placeholder="Enter your task here...",
-                    value=config['task'],
-                    info="Describe what you want the agent to do",
-                )
-                add_infos = gr.Textbox(
-                    label="Additional Information",
-                    lines=3,
-                    placeholder="Add any helpful context or instructions...",
-                    info="Optional hints to help the LLM complete the task",
+                with gr.Row():
+                    with gr.Column():
+                        with gr.Row():
+                            task = gr.Textbox(
+                                label="Task Description",
+                                lines=4,
+                                placeholder="Enter your task here...",
+                                value=config['task'],
+                                info="Describe what you want the agent to do",
+                                scale=4,  # Take up 4/5 of the width
+                            )
+                            enhance_task_button = gr.Button(
+                                "Enhance", 
+                                elem_classes="enhance-button", 
+                                size="sm", 
+                                min_width=100, 
+                                scale=1
+                            )
+
+                with gr.Row():
+                    with gr.Column():
+                        with gr.Row():
+                            add_infos = gr.Textbox(
+                                label="Additional Information",
+                                lines=3,
+                                placeholder="Add any helpful context or instructions...",
+                                info="Optional hints to help the LLM complete the task",
+                                scale=4
+                            )
+                            enhance_context_button = gr.Button(
+                                "Enhance",
+                                elem_classes="enhance-button",
+                                size="sm",
+                                min_width=100,
+                                scale=1
+                            )
+
+                # Status output for agent controls
+                agent_status = gr.Textbox(
+                    label="Agent Status",
+                    interactive=False
                 )
 
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
-                    
+                    pause_button = gr.Button("⏸️ Pause", variant="secondary", scale=1)
+                    resume_button = gr.Button("▶️ Resume", variant="secondary", scale=1, interactive=False)
+
+                # Add context update in the agent tab
                 with gr.Row():
-                    browser_view = gr.HTML(
-                        value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
-                        label="Live Browser View",
+                    with gr.Column():
+                        with gr.Row():
+                            context_input = gr.Textbox(
+                                label="Update Agent Context",
+                                placeholder="Add new instructions or context for the agent...",
+                                lines=3,
+                                info="Additional context or instructions to guide the agent",
+                                scale=4
+                            )
+                            enhance_update_button = gr.Button(
+                                "Enhance",
+                                elem_classes="enhance-button", 
+                                size="sm",
+                                min_width=100,
+                                scale=1
+                            )
+                        update_context_button = gr.Button("Update Context", variant="secondary", scale=1)
+
+                # Update the context update handler
+                async def update_context_from_text(text: str):
+                    try:
+                        await _global_agent_state.update_context({"user_input": text})
+                        return "Context updated successfully"
+                    except Exception as e:
+                        return f"Error updating context: {str(e)}"
+
+                # Add event handlers for the agent controls
+                pause_button.click(
+                    fn=pause_agent,
+                    outputs=[agent_status, pause_button, resume_button]
+                )
+                resume_button.click(
+                    fn=resume_agent,
+                    outputs=[agent_status, pause_button, resume_button]
+                )
+                update_context_button.click(
+                    fn=update_context_from_text,
+                    inputs=[context_input],
+                    outputs=[agent_status]
+                )
+
+                # Add enhance prompt handlers
+                enhance_task_button.click(
+                    fn=enhance_prompt,
+                    inputs=[
+                        task,
+                        gr.State("task"),
+                        llm_provider,
+                        llm_model_name,
+                        llm_temperature,
+                        llm_base_url,
+                        llm_api_key
+                    ],
+                    outputs=[task]
+                )
+
+                enhance_context_button.click(
+                    fn=enhance_prompt,
+                    inputs=[
+                        add_infos,
+                        gr.State("context"),
+                        llm_provider,
+                        llm_model_name,
+                        llm_temperature,
+                        llm_base_url,
+                        llm_api_key
+                    ],
+                    outputs=[add_infos]
+                )
+
+                enhance_update_button.click(
+                    fn=enhance_prompt,
+                    inputs=[
+                        context_input,
+                        gr.State("update"),
+                        llm_provider,
+                        llm_model_name,
+                        llm_temperature,
+                        llm_base_url,
+                        llm_api_key
+                    ],
+                    outputs=[context_input]
                 )
 
             with gr.TabItem("📁 Configuration", id=5):
@@ -841,8 +1090,7 @@ def create_ui(config, theme_name="Ocean"):
 
             with gr.TabItem("📊 Results", id=6):
                 with gr.Group():
-
-                    recording_display = gr.Video(label="Latest Recording")
+                    recording_display = gr.HTML(label="Browser View")
 
                     gr.Markdown("### Results")
                     with gr.Row():
@@ -885,7 +1133,7 @@ def create_ui(config, theme_name="Ocean"):
                             enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
                         ],
                     outputs=[
-                        browser_view,           # Browser view
+                        recording_display,           # Browser view
                         final_result_output,    # Final result
                         errors_output,          # Errors
                         model_actions_output,   # Model actions
