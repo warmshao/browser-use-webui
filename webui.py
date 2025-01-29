@@ -184,6 +184,9 @@ async def run_browser_agent(
             gr.update(interactive=True)    # Re-enable run button
         )
 
+    except gr.Error:
+        raise
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -535,6 +538,12 @@ async def run_with_stream(
             try:
                 result = await agent_task
                 final_result, errors, model_actions, model_thoughts, latest_videos, trace, history_file, stop_button, run_button = result
+            except gr.Error:
+                final_result = ""
+                model_actions = ""
+                model_thoughts = ""
+                latest_videos = trace = history_file = None
+
             except Exception as e:
                 errors = f"Agent error: {str(e)}"
 
