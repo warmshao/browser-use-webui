@@ -30,15 +30,7 @@ from langchain_core.output_parsers.base import OutputParserLike
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Literal,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any
 
 class DeepSeekR1ChatOpenAI(ChatOpenAI):
     
@@ -52,9 +44,9 @@ class DeepSeekR1ChatOpenAI(ChatOpenAI):
     async def ainvoke(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> AIMessage:
         message_history = []
@@ -78,9 +70,9 @@ class DeepSeekR1ChatOpenAI(ChatOpenAI):
     def invoke(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> AIMessage:
         message_history = []
@@ -106,9 +98,9 @@ class DeepSeekR1ChatOllama(ChatOllama):
     async def ainvoke(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> AIMessage:
         org_ai_message = await super().ainvoke(input=input)
@@ -122,9 +114,9 @@ class DeepSeekR1ChatOllama(ChatOllama):
     def invoke(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> AIMessage:
         org_ai_message = super().invoke(input=input)
