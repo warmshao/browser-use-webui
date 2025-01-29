@@ -2,6 +2,7 @@ import base64
 import os
 import time
 from pathlib import Path
+from typing import Dict, Optional
 
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -164,9 +165,9 @@ def encode_image(img_path):
     return image_data
 
 
-def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> dict[str, str | None]:
+def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Dict[str, Optional[str]]:
     """Get the latest recording and trace files"""
-    latest_files: dict[str, str | None] = {ext: None for ext in file_types}
+    latest_files: Dict[str, Optional[str]] = {ext: None for ext in file_types}
     
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
@@ -218,5 +219,5 @@ async def capture_screenshot(browser_context):
         )
         encoded = base64.b64encode(screenshot).decode('utf-8')
         return encoded
-    except Exception:
+    except Exception as e:
         return None

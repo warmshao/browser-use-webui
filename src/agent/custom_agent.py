@@ -2,7 +2,7 @@ import json
 import logging
 import pdb
 import traceback
-from typing import Any, Callable
+from typing import Optional, Type, List, Dict, Any, Callable
 from PIL import Image, ImageDraw, ImageFont
 import os
 import base64
@@ -50,11 +50,11 @@ class CustomAgent(Agent):
             browser_context: BrowserContext | None = None,
             controller: Controller = Controller(),
             use_vision: bool = True,
-            save_conversation_path: str | None = None,
+            save_conversation_path: Optional[str] = None,
             max_failures: int = 5,
             retry_delay: int = 10,
-            system_prompt_class: type[SystemPrompt] = SystemPrompt,
-            agent_prompt_class: type[AgentMessagePrompt] = AgentMessagePrompt,
+            system_prompt_class: Type[SystemPrompt] = SystemPrompt,
+            agent_prompt_class: Type[AgentMessagePrompt] = AgentMessagePrompt,
             max_input_tokens: int = 128000,
             validate_output: bool = False,
             include_attributes: list[str] = [
@@ -73,11 +73,11 @@ class CustomAgent(Agent):
             max_actions_per_step: int = 10,
             tool_call_in_content: bool = True,
             agent_state: AgentState = None,
-            initial_actions: list[dict[str, dict[str, Any]]] | None = None,
+            initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
             # Cloud Callbacks
             register_new_step_callback: Callable[['BrowserState', 'AgentOutput', int], None] | None = None,
             register_done_callback: Callable[['AgentHistoryList'], None] | None = None,
-            tool_calling_method: str | None = 'auto',
+            tool_calling_method: Optional[str] = 'auto',
     ):
         super().__init__(
             task=task,
@@ -220,7 +220,7 @@ class CustomAgent(Agent):
         return parsed
 
     @time_execution_async("--step")
-    async def step(self, step_info: CustomAgentStepInfo | None = None) -> None:
+    async def step(self, step_info: Optional[CustomAgentStepInfo] = None) -> None:
         """Execute one step of the task"""
         logger.info(f"\n📍 Step {self.n_steps}")
         state = None

@@ -502,7 +502,7 @@ async def run_with_stream(
                         html_content = f'<img src="data:image/jpeg;base64,{encoded_screenshot}" style="width:{stream_vw}vw; height:{stream_vh}vh ; border:1px solid #ccc;">'
                     else:
                         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
-                except Exception:
+                except Exception as e:
                     html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
 
                 if _global_agent_state and _global_agent_state.is_stop_requested():

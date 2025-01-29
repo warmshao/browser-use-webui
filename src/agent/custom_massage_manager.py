@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import List, Optional, Type
 
 from browser_use.agent.message_manager.service import MessageManager
 from browser_use.agent.message_manager.views import MessageHistory
@@ -29,15 +30,15 @@ class CustomMassageManager(MessageManager):
             llm: BaseChatModel,
             task: str,
             action_descriptions: str,
-            system_prompt_class: type[SystemPrompt],
-            agent_prompt_class: type[AgentMessagePrompt],
+            system_prompt_class: Type[SystemPrompt],
+            agent_prompt_class: Type[AgentMessagePrompt],
             max_input_tokens: int = 128000,
             estimated_characters_per_token: int = 3,
             image_tokens: int = 800,
             include_attributes: list[str] = [],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
-            message_context: str | None = None
+            message_context: Optional[str] = None
     ):
         super().__init__(
             llm=llm,
@@ -73,9 +74,9 @@ class CustomMassageManager(MessageManager):
     def add_state_message(
             self,
             state: BrowserState,
-            actions: list[ActionModel] | None = None,
-            result: list[ActionResult] | None = None,
-            step_info: AgentStepInfo | None = None,
+            actions: Optional[List[ActionModel]] = None,
+            result: Optional[List[ActionResult]] = None,
+            step_info: Optional[AgentStepInfo] = None,
     ) -> None:
         """Add browser state as human message"""
         # otherwise add state message and result to next message (which will not stay in memory)

@@ -1,4 +1,5 @@
 import pyperclip
+from typing import Optional, Type
 from pydantic import BaseModel
 from browser_use.agent.views import ActionResult
 from browser_use.browser.context import BrowserContext
@@ -7,7 +8,7 @@ from browser_use.controller.service import Controller, DoneAction
 
 class CustomController(Controller):
     def __init__(self, exclude_actions: list[str] = [],
-                output_model: type[BaseModel] | None = None
+                output_model: Optional[Type[BaseModel]] = None
                 ):
         super().__init__(exclude_actions=exclude_actions, output_model=output_model)
         self._register_custom_actions()
