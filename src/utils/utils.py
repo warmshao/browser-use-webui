@@ -11,14 +11,6 @@ import gradio as gr
 
 from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
 
-PROVIDER_DISPLAY_NAMES = {
-    "openai": "OpenAI",
-    "azure_openai": "Azure OpenAI",
-    "anthropic": "Anthropic",
-    "deepseek": "DeepSeek",
-    "gemini": "Gemini"
-}
-
 def get_llm_model(provider: str, **kwargs):
     """
     获取LLM 模型
@@ -26,18 +18,16 @@ def get_llm_model(provider: str, **kwargs):
     :param kwargs:
     :return:
     """
-    if provider not in ["ollama"]:
-        env_var = "GOOGLE_API_KEY" if provider == "gemini" else f"{provider.upper()}_API_KEY"
-        api_key = kwargs.get("api_key", "") or os.getenv(env_var, "")
-        if not api_key:
-            handle_api_key_error(provider, env_var)
-        kwargs["api_key"] = api_key
-
     if provider == "anthropic":
         if not kwargs.get("base_url", ""):
             base_url = "https://api.anthropic.com"
         else:
             base_url = kwargs.get("base_url")
+
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
 
         return ChatAnthropic(
             model_name=kwargs.get("model_name", "claude-3-5-sonnet-20240620"),
@@ -51,6 +41,11 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("OPENAI_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
+
         return ChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
             temperature=kwargs.get("temperature", 0.0),
@@ -62,6 +57,11 @@ def get_llm_model(provider: str, **kwargs):
             base_url = os.getenv("DEEPSEEK_ENDPOINT", "")
         else:
             base_url = kwargs.get("base_url")
+
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
 
         if kwargs.get("model_name", "deepseek-chat") == "deepseek-reasoner":
             return DeepSeekR1ChatOpenAI(
@@ -78,6 +78,10 @@ def get_llm_model(provider: str, **kwargs):
                 api_key=api_key,
             )
     elif provider == "gemini":
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("GOOGLE_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
         return ChatGoogleGenerativeAI(
             model=kwargs.get("model_name", "gemini-2.0-flash-exp"),
             temperature=kwargs.get("temperature", 0.0),
@@ -109,6 +113,10 @@ def get_llm_model(provider: str, **kwargs):
             base_url = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         else:
             base_url = kwargs.get("base_url")
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
         return AzureChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
             temperature=kwargs.get("temperature", 0.0),
@@ -145,16 +153,6 @@ def update_model_dropdown(llm_provider, api_key=None, base_url=None):
         return gr.Dropdown(choices=model_names[llm_provider], value=model_names[llm_provider][0], interactive=True)
     else:
         return gr.Dropdown(choices=[], value="", interactive=True, allow_custom_value=True)
-
-def handle_api_key_error(provider: str, env_var: str):
-    """
-    Handles the missing API key error by raising a gr.Error with a clear message.
-    """
-    provider_display = PROVIDER_DISPLAY_NAMES.get(provider, provider.upper())
-    raise gr.Error(
-        f"💥 {provider_display} API key not found! 🔑 Please set the "
-        f"`{env_var}` environment variable or provide it in the UI."
-    )
 
 def encode_image(img_path):
     if not img_path:
