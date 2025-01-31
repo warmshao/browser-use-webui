@@ -117,8 +117,8 @@ playwright install
         > Note: Replace `YourUsername` with your actual Windows username for Windows systems.
       - Mac
         ```env
-         export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-         export CHROME_USER_DATA="~/Library/Application Support/Google/Chrome/Profile 1"
+         CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+         CHROME_USER_DATA="~/Library/Application Support/Google/Chrome/Profile 1"
         ```
     - Close all Chrome windows
     - Open the WebUI in a non-Chrome browser, such as Firefox or Edge. This is important because the persistent browser context will use the Chrome data when running the agent.

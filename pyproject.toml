@@ -14,7 +14,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
 ]
-dependencies = [ "python-dotenv>=1.0.1,<2", "browser-use>=0.1.19,<0.1.20", "langchain-google-genai>=2.0.8,<3", "gradio>=5.13.1,<6", "langchain-ollama>=0.2.2,<0.3", "langchain-openai>=0.3.1,<0.4", "pytz>=2024.2,<2025", "importlib-metadata>=8.5.0,<9", "pyperclip==1.9.0",
+dependencies = [ "python-dotenv>=1.0.1,<2", "browser-use>=0.1.29,<0.1.30", "langchain-google-genai>=2.0.8,<3", "gradio>=5.13.1,<6", "langchain-ollama>=0.2.2,<0.3", "langchain-openai>=0.3.1,<0.4", "pytz>=2024.2,<2025", "importlib-metadata>=8.5.0,<9", "pyperclip==1.9.0",
 ]
 
 [project.urls]
@@ -27,7 +27,7 @@ requires = ["hatchling"]
 
 [tool.pixi.project]
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-64", "osx-arm64"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
@@ -58,6 +58,7 @@ pytest-mock = ">=3.14.0,<4"
 typer = ">=0.15.1,<0.16"
 typing = ">=3.10.0.0,<4"
 quarto = ">=1.6.40,<2"
+json-repair = ">=0.35.0,<0.36"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
