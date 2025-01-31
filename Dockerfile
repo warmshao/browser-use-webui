@@ -3,6 +3,7 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
+    netcat-traditional \
     gnupg \
     curl \
     unzip \
@@ -61,6 +62,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps chromium
 RUN playwright install-deps
+RUN apt-get install -y google-chrome-stable
 
 # Copy the application code
 COPY . .

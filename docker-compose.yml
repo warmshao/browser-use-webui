@@ -1,5 +1,6 @@
 services:
   browser-use-webui:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,13 +29,9 @@ services:
       - RESOLUTION_WIDTH=${RESOLUTION_WIDTH:-1920}
       - RESOLUTION_HEIGHT=${RESOLUTION_HEIGHT:-1080}
       - VNC_PASSWORD=${VNC_PASSWORD:-vncpassword}
-      - PERSISTENT_BROWSER_PORT=9222
-      - PERSISTENT_BROWSER_HOST=localhost
       - CHROME_DEBUGGING_PORT=9222
       - CHROME_DEBUGGING_HOST=localhost
     volumes:
-      - ./data:/app/data
-      - ./data/chrome_data:/app/data/chrome_data
       - /tmp/.X11-unix:/tmp/.X11-unix
     restart: unless-stopped
     shm_size: '2gb'
