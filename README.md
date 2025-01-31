@@ -109,6 +109,12 @@ playwright install
 3.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
 4.  **Using Your Own Browser(Optional):**
     - Set `CHROME_PATH` to the executable path of your browser and `CHROME_USER_DATA` to the user data directory of your browser. Leave `CHROME_USER_DATA` empty if you want to use local user data.
+      - Ubuntu
+        ```env
+         CHROME_PATH="/usr/bin/google-chrome"
+         CHROME_USER_DATA="/home/YourUsername/.config/google-chrome"
+        ```
+        > Note: Replace `YourUsername` with your actual Ubuntu username.
       - Windows
         ```env
          CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
