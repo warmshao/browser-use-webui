@@ -24,6 +24,7 @@ from browser_use.browser.context import (
 from langchain_ollama import ChatOllama
 from playwright.async_api import async_playwright
 from src.utils.agent_state import AgentState
+from src.utils.llm_providers import MODEL_NAMES
 
 from src.utils import utils
 from src.agent.custom_agent import CustomAgent
@@ -759,14 +760,14 @@ def create_ui(config, theme_name="Ocean"):
             with gr.TabItem("🔧 LLM Configuration", id=2):
                 with gr.Group():
                     llm_provider = gr.Dropdown(
-                        choices=[provider for provider,model in utils.model_names.items()],
+                        choices=[provider for provider,model in MODEL_NAMES.items()],
                         label="LLM Provider",
                         value=config['llm_provider'],
                         info="Select your preferred language model provider"
                     )
                     llm_model_name = gr.Dropdown(
                         label="Model Name",
-                        choices=utils.model_names['openai'],
+                        choices=MODEL_NAMES['openai'],
                         value=config['llm_model_name'],
                         interactive=True,
                         allow_custom_value=True,  # Allow users to input custom model names
