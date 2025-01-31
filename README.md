@@ -112,9 +112,8 @@ playwright install
       - Ubuntu
         ```env
          CHROME_PATH="/usr/bin/google-chrome"
-         CHROME_USER_DATA="/home/YourUsername/.config/google-chrome"
+         CHROME_USER_DATA=${HOME}/.config/google-chrome
         ```
-        > Note: Replace `YourUsername` with your actual Ubuntu username.
       - Windows
         ```env
          CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
