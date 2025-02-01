@@ -10,7 +10,6 @@ from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-import gradio as gr
 
 from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
 
@@ -29,7 +28,7 @@ def get_llm_model(provider: str, **kwargs):
     if provider not in {"ollama"}:
         api_key = get_config_value(provider, "api_key", **kwargs)
         if not api_key:
-            handle_api_key_error(provider)
+            raise MissingAPIKeyError(provider)
 
     base_url = get_config_value(provider, "base_url", **kwargs)
     model_name = get_config_value(provider, "model", **kwargs)
@@ -121,10 +120,24 @@ def get_llm_model(provider: str, **kwargs):
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
+class MissingAPIKeyError(Exception):
+    """Custom exception raised when an API key is missing."""
+    def __init__(self, provider: str):
+        self.provider = provider
+        super().__init__(self.message())
+
+    def message(self):
+        provider_display = PROVIDER_DISPLAY_NAMES.get(self.provider, self.provider.upper())
+        config = get_provider_config(self.provider)
+        env_var = config.get("api_key_env")
+        return (f"💥 {provider_display} API key not found! 🔑 Please set the "
+                f"`{env_var}` environment variable or provide it in the UI.")
+
 def update_model_dropdown(llm_provider, api_key=None, base_url=None):
     """
     Update the model name dropdown with predefined models for the selected provider.
     """
+    import gradio as gr
     # Use API keys from .env if not provided
     if not api_key:
         api_key = get_config_value(llm_provider, "api_key")
@@ -135,18 +148,6 @@ def update_model_dropdown(llm_provider, api_key=None, base_url=None):
     if llm_provider in MODEL_NAMES:
         return gr.Dropdown(choices=MODEL_NAMES[llm_provider], value=MODEL_NAMES[llm_provider][0], interactive=True)
     return gr.Dropdown(choices=[], value="", interactive=True, allow_custom_value=True)
-
-def handle_api_key_error(provider: str):
-    """
-    Handles the missing API key error by raising a gr.Error with a clear message.
-    """
-    provider_display = PROVIDER_DISPLAY_NAMES.get(provider, provider.upper())
-    config = get_provider_config(provider)
-    env_var = config.get("api_key_env")
-    raise gr.Error(
-        f"💥 {provider_display} API key not found! 🔑 Please set the "
-        f"`{env_var}` environment variable or provide it in the UI."
-    )
 
 def encode_image(img_path):
     if not img_path:
@@ -210,5 +211,5 @@ async def capture_screenshot(browser_context):
         )
         encoded = base64.b64encode(screenshot).decode('utf-8')
         return encoded
-    except Exception as e:
+    except Exception:
         return None
