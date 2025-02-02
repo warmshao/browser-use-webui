@@ -120,6 +120,7 @@ def get_llm_model(provider: str, **kwargs):
                 temperature=kwargs.get("temperature", 0.0),
                 num_ctx=kwargs.get("num_ctx", 32000),
                 num_predict=kwargs.get("num_predict", 1024),
+                num_gpu=1,  # Explicitly enable GPU usage
                 base_url=kwargs.get("base_url", base_url),
             )
     elif provider == "azure_openai":
