@@ -48,17 +48,17 @@ _global_agent_state = AgentState()
 
 fgGreen = Color(
     name="fgGreen",
-    c50="#00E676",
-    c100="#00E676",
-    c200="#00E676",
-    c300="#00E676",
-    c400="#00E676",
-    c500="#00E676",
-    c600="#00E676",
-    c700="#00E676",
-    c800="#00E676",
-    c900="#00E676",
-    c950="#00E676",
+    c50="#1e88e5",
+    c100="#1e88e5",
+    c200="#1e88e5",
+    c300="#1e88e5",
+    c400="#1e88e5",
+    c500="#1e88e5",
+    c600="#1e88e5",
+    c700="#1e88e5",
+    c800="#1e88e5",
+    c900="#1e88e5",
+    c950="#1e88e5",
 )
 class FieldguideTheme(Base):
     def __init__(
@@ -278,7 +278,7 @@ async def run_org_agent(
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state
-        
+
         # Clear any previous stop request
         _global_agent_state.clear_stop()
 
@@ -292,7 +292,7 @@ async def run_org_agent(
                 extra_chromium_args += [f"--user-data-dir={chrome_user_data}"]
         else:
             chrome_path = None
-            
+
         if _global_browser is None:
             _global_browser = Browser(
                 config=BrowserConfig(
@@ -314,7 +314,7 @@ async def run_org_agent(
                     ),
                 )
             )
-            
+
         agent = Agent(
             task=task,
             llm=llm,
@@ -412,7 +412,7 @@ async def run_custom_agent(
                     ),
                 )
             )
-            
+
         # Create and run agent
         agent = CustomAgent(
             task=task,
@@ -438,7 +438,7 @@ async def run_custom_agent(
         model_actions = history.model_actions()
         model_thoughts = history.model_thoughts()
 
-        trace_file = get_latest_files(save_trace_path)        
+        trace_file = get_latest_files(save_trace_path)
 
         return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), history_file
     except Exception as e:
@@ -881,7 +881,7 @@ def create_ui(config, theme_name="Ocean"):
                         use_own_browser, keep_browser_open, headless, disable_security,
                         enable_recording, window_w, window_h, save_recording_path, save_trace_path,
                         save_agent_history_path, task,
-                    ],  
+                    ],
                     outputs=[config_status]
                 )
 
