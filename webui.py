@@ -1,7 +1,10 @@
 import pdb
 import logging
+from typing import Iterable
 
 from dotenv import load_dotenv
+from gradio.themes.utils import colors, sizes
+from gradio.themes.utils import fonts
 
 load_dotenv()
 import os
@@ -31,7 +34,7 @@ from src.browser.custom_browser import CustomBrowser
 from src.agent.custom_prompts import CustomSystemPrompt, CustomAgentMessagePrompt
 from src.browser.custom_context import BrowserContextConfig, CustomBrowserContext
 from src.controller.custom_controller import CustomController
-from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
+from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base, Color
 from src.utils.default_config_settings import default_config, load_config_from_file, save_config_to_file, save_current_config, update_ui_from_config
 from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
 
@@ -42,6 +45,58 @@ _global_browser_context = None
 
 # Create the global agent state instance
 _global_agent_state = AgentState()
+
+fgGreen = Color(
+    name="fgGreen",
+    c50="#00E676",
+    c100="#00E676",
+    c200="#00E676",
+    c300="#00E676",
+    c400="#00E676",
+    c500="#00E676",
+    c600="#00E676",
+    c700="#00E676",
+    c800="#00E676",
+    c900="#00E676",
+    c950="#00E676",
+)
+class FieldguideTheme(Base):
+    def __init__(
+        self,
+        *,
+        primary_hue: colors.Color | str = fgGreen,
+        secondary_hue: colors.Color | str = colors.blue,
+        neutral_hue: colors.Color | str = colors.gray,
+        spacing_size: sizes.Size | str = sizes.spacing_md,
+        radius_size: sizes.Size | str = sizes.radius_md,
+        text_size: sizes.Size | str = sizes.text_lg,
+        font: fonts.Font
+        | str
+        | Iterable[fonts.Font | str] = (
+            fonts.GoogleFont("Roboto"),
+            "ui-sans-serif",
+            "sans-serif",
+        ),
+        font_mono: fonts.Font
+        | str
+        | Iterable[fonts.Font | str] = (
+            fonts.GoogleFont("IBM Plex Mono"),
+            "ui-monospace",
+            "monospace",
+        ),
+    ):
+        super().__init__(
+            primary_hue=primary_hue,
+            secondary_hue=secondary_hue,
+            neutral_hue=neutral_hue,
+            spacing_size=spacing_size,
+            radius_size=radius_size,
+            text_size=text_size,
+            font=font,
+            font_mono=font_mono,
+        )
+
+fieldguide_theme = FieldguideTheme()
 
 async def stop_agent():
     """Request the agent to stop and update UI with enhanced feedback"""
@@ -501,9 +556,9 @@ async def run_with_stream(
                     if encoded_screenshot is not None:
                         html_content = f'<img src="data:image/jpeg;base64,{encoded_screenshot}" style="width:{stream_vw}vw; height:{stream_vh}vh ; border:1px solid #ccc;">'
                     else:
-                        html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
+                        html_content = f"<div style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</div>"
                 except Exception as e:
-                    html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>"
+                    html_content = f"<div style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</div>"
 
                 if _global_agent_state and _global_agent_state.is_stop_requested():
                     yield [
@@ -563,7 +618,7 @@ async def run_with_stream(
         except Exception as e:
             import traceback
             yield [
-                f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</h1>",
+                f"<div style='width:{stream_vw}vw; height:{stream_vh}vh'>Waiting for browser session...</div>",
                 "",
                 f"Error: {str(e)}\n{traceback.format_exc()}",
                 "",
@@ -584,7 +639,8 @@ theme_map = {
     "Origin": Origin(),
     "Citrus": Citrus(),
     "Ocean": Ocean(),
-    "Base": Base()
+    "Base": Base(),
+    "Fieldguide": FieldguideTheme()
 }
 
 async def close_global_browser():
@@ -620,15 +676,31 @@ def create_ui(config, theme_name="Ocean"):
             title="Browser Use WebUI", theme=theme_map[theme_name], css=css
     ) as demo:
         with gr.Row():
-            gr.Markdown(
-                """
-                # 🌐 Browser Use WebUI
-                ### Control your browser with AI assistance
-                """,
-                elem_classes=["header-text"],
+            task = gr.Textbox(
+                label="Task Description",
+                lines=4,
+                placeholder="Enter your task here...",
+                value=config['task'],
+                info="Describe what you want the agent to do",
+            )
+        with gr.Row():
+            add_infos = gr.Textbox(
+                label="Additional Information",
+                lines=3,
+                placeholder="Add any helpful context or instructions...",
+                info="Optional hints to help the LLM complete the task",
+            )
+        with gr.Row():
+            run_button = gr.Button("Run Agent", variant="primary", scale=2)
+            stop_button = gr.Button("Stop", variant="stop", scale=1)
+
+        with gr.Row():
+            browser_view = gr.HTML(
+                value="<div style='width:80vw; height:50vh'>Waiting for browser session...</div>",
+                label="Live Browser View",
             )
 
-        with gr.Tabs() as tabs:
+        with gr.Tabs(visible=False) as tabs:
             with gr.TabItem("⚙️ Agent Settings", id=1):
                 with gr.Group():
                     agent_type = gr.Radio(
@@ -771,31 +843,6 @@ def create_ui(config, theme_name="Ocean"):
                         info="Specify the directory where agent history should be saved.",
                         interactive=True,
                     )
-
-            with gr.TabItem("🤖 Run Agent", id=4):
-                task = gr.Textbox(
-                    label="Task Description",
-                    lines=4,
-                    placeholder="Enter your task here...",
-                    value=config['task'],
-                    info="Describe what you want the agent to do",
-                )
-                add_infos = gr.Textbox(
-                    label="Additional Information",
-                    lines=3,
-                    placeholder="Add any helpful context or instructions...",
-                    info="Optional hints to help the LLM complete the task",
-                )
-
-                with gr.Row():
-                    run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
-                    stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
-                    
-                with gr.Row():
-                    browser_view = gr.HTML(
-                        value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
-                        label="Live Browser View",
-                )
 
             with gr.TabItem("📁 Configuration", id=5):
                 with gr.Group():
@@ -960,7 +1007,7 @@ def main():
 
     config_dict = default_config()
 
-    demo = create_ui(config_dict, theme_name=args.theme)
+    demo = create_ui(config_dict, theme_name="Fieldguide")
     demo.launch(server_name=args.ip, server_port=args.port)
 
 if __name__ == '__main__':
