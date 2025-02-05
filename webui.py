@@ -931,6 +931,190 @@ def create_ui(config, theme_name="Ocean"):
                     outputs=recordings_gallery
                 )
 
+            with gr.TabItem("🧪 Gherkin Tests", id=8):
+                with gr.Group():
+                    gr.Markdown("### Gherkin Test Runner")
+                    
+                    # Display available feature files
+                    feature_list = gr.Dropdown(
+                        label="Available Feature Files",
+                        choices=glob.glob("features/**/*.feature", recursive=True),
+                        value=None,
+                        info="Select a feature file to run",
+                        allow_custom_value=False
+                    )
+                    
+                    # Display feature file content
+                    feature_content = gr.TextArea(
+                        label="Feature File Content",
+                        interactive=False,
+                        lines=10
+                    )
+
+                    # Add LLM configuration for tests
+                    with gr.Row():
+                        test_llm_provider = gr.Dropdown(
+                            label="LLM Provider for Tests",
+                            choices=[provider for provider,model in utils.model_names.items()],
+                            value="ollama",
+                            info="Select LLM provider for running tests"
+                        )
+                        test_llm_model = gr.Dropdown(
+                            label="Model Name for Tests",
+                            choices=utils.model_names['ollama'],
+                            value="deepseek-r1:14b",
+                            info="Select model for running tests"
+                        )
+                    
+                    with gr.Row():
+                        run_tests_button = gr.Button("▶️ Run Selected Test", variant="primary")
+                        run_all_tests_button = gr.Button("▶️ Run All Tests", variant="primary")
+                        clear_results_button = gr.Button("🗑️ Clear Results")
+                    
+                    test_results = gr.Dataframe(
+                        headers=["Feature", "Scenario", "Status", "Duration", "Error"],
+                        label="Test Results",
+                        interactive=False
+                    )
+                    
+                    test_output = gr.Textbox(
+                        label="Test Output",
+                        lines=10,
+                        interactive=False
+                    )
+
+                    def load_feature_content(feature_path):
+                        if not feature_path:
+                            return ""
+                        try:
+                            with open(feature_path, 'r') as f:
+                                return f.read()
+                        except Exception as e:
+                            return f"Error loading feature file: {str(e)}"
+
+                    async def run_selected_test(feature_path, llm_provider, llm_model):
+                        if not feature_path:
+                            return [], "Please select a feature file to run"
+                        
+                        return await run_gherkin_tests([feature_path], llm_provider, llm_model)
+
+                    async def run_all_gherkin_tests(llm_provider, llm_model):
+                        feature_files = glob.glob("features/**/*.feature", recursive=True)
+                        return await run_gherkin_tests(feature_files, llm_provider, llm_model)
+
+                    async def run_gherkin_tests(feature_files, llm_provider, llm_model):
+                        import os
+                        import json
+                        import asyncio
+                        from behave.__main__ import run_behave
+                        from behave.configuration import Configuration
+                        
+                        results = []
+                        output = ""
+                        
+                        try:
+                            # Set up environment variables for tests
+                            os.environ['TEST_LLM_PROVIDER'] = llm_provider
+                            os.environ['TEST_LLM_MODEL'] = llm_model
+                            
+                            # Create reports directory if it doesn't exist
+                            os.makedirs('reports', exist_ok=True)
+                            
+                            # Prepare behave arguments
+                            args = [
+                                '--format', 'json.pretty',
+                                '--outfile', os.path.join('reports', 'behave.json'),
+                                '--no-capture',  # Show stdout in real time
+                                '--no-skipped'   # Don't show skipped tests
+                            ]
+                            if feature_files:
+                                args.extend(feature_files)
+                            
+                            # Run behave in a separate thread to avoid event loop conflicts
+                            def run_tests():
+                                config = Configuration(args)
+                                return run_behave(config)
+                            
+                            # Run tests in an executor
+                            loop = asyncio.get_event_loop()
+                            success = await loop.run_in_executor(None, run_tests)
+                            
+                            # Process results from the JSON output file
+                            json_output_path = os.path.join('reports', 'behave.json')
+                            if os.path.exists(json_output_path):
+                                with open(json_output_path, 'r') as f:
+                                    test_data = json.load(f)
+                                
+                                # Convert to dataframe format
+                                for feature in test_data:
+                                    for scenario in feature.get('elements', []):
+                                        if scenario.get('type') == 'scenario':
+                                            status = "Passed"
+                                            error = ""
+                                            duration = 0.0
+                                            
+                                            # Check steps for failures
+                                            for step in scenario.get('steps', []):
+                                                step_result = step.get('result', {})
+                                                if step_result.get('status') != 'passed':
+                                                    status = "Failed"
+                                                    error = step_result.get('error_message', '')
+                                                duration += float(step_result.get('duration', 0))
+                                            
+                                            results.append([
+                                                feature.get('name', ''),
+                                                scenario.get('name', ''),
+                                                status,
+                                                f"{duration:.2f}s",
+                                                error
+                                            ])
+                                
+                                with open(json_output_path, 'r') as f:
+                                    output = f.read()
+                            else:
+                                output = "No test output file found"
+                                
+                        except Exception as e:
+                            import traceback
+                            output = f"Error running tests:\n{str(e)}\n{traceback.format_exc()}"
+                            
+                        return results, output
+
+                    def clear_test_results():
+                        return [], ""
+                    
+                    # Connect event handlers
+                    feature_list.change(
+                        fn=load_feature_content,
+                        inputs=[feature_list],
+                        outputs=[feature_content]
+                    )
+                    
+                    run_tests_button.click(
+                        fn=run_selected_test,
+                        inputs=[feature_list, test_llm_provider, test_llm_model],
+                        outputs=[test_results, test_output]
+                    )
+                    
+                    run_all_tests_button.click(
+                        fn=run_all_gherkin_tests,
+                        inputs=[test_llm_provider, test_llm_model],
+                        outputs=[test_results, test_output]
+                    )
+                    
+                    clear_results_button.click(
+                        fn=clear_test_results,
+                        inputs=[],
+                        outputs=[test_results, test_output]
+                    )
+
+                    # Update test model dropdown when provider changes
+                    test_llm_provider.change(
+                        lambda provider: gr.update(choices=utils.model_names[provider]),
+                        inputs=[test_llm_provider],
+                        outputs=[test_llm_model]
+                    )
+
         # Attach the callback to the LLM provider dropdown
         llm_provider.change(
             lambda provider, api_key, base_url: update_model_dropdown(provider, api_key, base_url),

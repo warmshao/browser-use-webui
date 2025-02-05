@@ -219,3 +219,46 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 - [x] **2025/01/26:** Thanks to @vvincent1234. Now browser-use-webui can combine with DeepSeek-r1 to engage in deep thinking!
 - [x] **2025/01/10:** Thanks to @casistack. Now we have Docker Setup option and also Support keep browser open between tasks.[Video tutorial demo](https://github.com/browser-use/web-ui/issues/1#issuecomment-2582511750).
 - [x] **2025/01/06:** Thanks to @richard-devbot. A New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
+
+## Gherkin Tests
+
+### Writing Tests
+1. Create `.feature` files in the `features` directory using Gherkin syntax
+2. Implement step definitions in `features/steps` directory
+3. Use the WebUI's Gherkin Tests tab to run and manage tests
+
+### Running Tests
+There are two ways to run the Gherkin tests:
+
+1. **Using the WebUI:**
+   - Navigate to the "🧪 Gherkin Tests" tab
+   - Upload your feature files
+   - Click "Run Tests" to execute
+   - View results in the test results table and output log
+
+2. **Using Command Line:**
+   ```bash
+   # Run all tests
+   behave
+
+   # Run specific feature file
+   behave features/browser_search.feature
+
+   # Run with JSON output
+   behave --format json.pretty
+   ```
+
+### Example Feature File
+```gherkin
+Feature: Browser Search Functionality
+    Scenario: Search on Google
+        Given I am on the Google homepage
+        When I search for "OpenAI"
+        Then I should see search results
+        And the first result should contain "openai.com"
+```
+
+### Test Structure
+- `features/`: Directory containing all feature files
+- `features/steps/`: Directory containing step definitions
+- `features/environment.py`: Test environment setup and teardown

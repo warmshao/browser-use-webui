@@ -1,0 +1,1052 @@
+[
+{
+  "description": [
+    "As a user",
+    "I want to interact with web elements",
+    "So that I can perform actions on websites"
+  ],
+  "elements": [
+    {
+      "keyword": "Scenario",
+      "location": "features/interaction.feature:6",
+      "name": "Fill and submit a form",
+      "status": "passed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/interaction.feature:7",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 0.00012993812561035156,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/interaction.feature:8",
+          "match": {
+            "arguments": [
+              {
+                "name": "text",
+                "value": "Python programming"
+              }
+            ],
+            "location": "features/steps/interaction_steps.py:5"
+          },
+          "name": "I type \"Python programming\" in the search box",
+          "result": {
+            "duration": 25.988429069519043,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "And",
+          "location": "features/interaction.feature:9",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/interaction_steps.py:19"
+          },
+          "name": "I click the search button",
+          "result": {
+            "duration": 12.059454917907715,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/interaction.feature:10",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:24"
+          },
+          "name": "I should see search results",
+          "result": {
+            "duration": 11.884151220321655,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/interaction.feature:11",
+          "match": {
+            "arguments": [
+              {
+                "name": "text",
+                "value": "Python programming"
+              }
+            ],
+            "location": "features/steps/interaction_steps.py:61"
+          },
+          "name": "the page title should contain \"Python programming\"",
+          "result": {
+            "duration": 3.246124029159546,
+            "status": "passed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/interaction.feature:13",
+      "name": "Click and verify links",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/interaction.feature:14",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 8.273124694824219e-05,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/interaction.feature:15",
+          "match": {
+            "arguments": [
+              {
+                "name": "query",
+                "value": "OpenAI"
+              }
+            ],
+            "location": "features/steps/browser_steps.py:13"
+          },
+          "name": "I search for \"OpenAI\"",
+          "result": {
+            "duration": 5.793571472167969e-05,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "And",
+          "location": "features/interaction.feature:16",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/interaction_steps.py:33"
+          },
+          "name": "I click the first link",
+          "result": {
+            "duration": 12.400773763656616,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/interaction.feature:17",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "openai.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:81"
+          },
+          "name": "I should be on \"openai.com\"",
+          "result": {
+            "duration": 7.521076917648315,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/interaction.feature:18",
+          "name": "I should see the OpenAI logo",
+          "result": {
+            "duration": 0,
+            "status": "undefined"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/interaction.feature:20",
+      "name": "Scroll and interact",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/interaction.feature:21",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "github.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:5"
+          },
+          "name": "I am on \"github.com\"",
+          "result": {
+            "duration": 7.779366970062256,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/interaction.feature:22",
+          "match": {
+            "arguments": [
+              {
+                "name": "position",
+                "value": "bottom"
+              }
+            ],
+            "location": "features/steps/interaction_steps.py:47"
+          },
+          "name": "I scroll to the bottom of the page",
+          "result": {
+            "duration": 14.131715059280396,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/interaction.feature:23",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/interaction_steps.py:106"
+          },
+          "name": "I should see the footer",
+          "result": {
+            "duration": 26.27523112297058,
+            "error_message": [
+              "Traceback (most recent call last):",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/model.py\", line 1329, in run",
+              "    match.run(runner.context)",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/matchers.py\", line 98, in run",
+              "    self.func(context, *args, **kwargs)",
+              "  File \"features/steps/interaction_steps.py\", line 119, in step_impl",
+              "    assert context.history.errors() == []",
+              "          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "AssertionError",
+              "",
+              "Captured logging:",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).."
+            ],
+            "status": "failed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/interaction.feature:24",
+          "name": "I scroll to the top",
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/interaction.feature:25",
+          "name": "I should see the header",
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    }
+  ],
+  "keyword": "Feature",
+  "location": "features/interaction.feature:1",
+  "name": "Browser Interaction",
+  "status": "failed",
+  "tags": []
+},
+
+{
+  "description": [
+    "As a user",
+    "I want to navigate between different websites",
+    "So that I can access various web content"
+  ],
+  "elements": [
+    {
+      "keyword": "Scenario",
+      "location": "features/navigation.feature:6",
+      "name": "Navigate to multiple sites",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/navigation.feature:7",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 8.606910705566406e-05,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/navigation.feature:8",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "github.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:24"
+          },
+          "name": "I navigate to \"github.com\"",
+          "result": {
+            "duration": 6.995939016342163,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/navigation.feature:9",
+          "match": {
+            "arguments": [
+              {
+                "name": "text",
+                "value": "GitHub"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:66"
+          },
+          "name": "I should see \"GitHub\" in the page",
+          "result": {
+            "duration": 18.68598508834839,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/navigation.feature:10",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "openai.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:24"
+          },
+          "name": "I navigate to \"openai.com\"",
+          "result": {
+            "duration": 6.617936849594116,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/navigation.feature:11",
+          "match": {
+            "arguments": [
+              {
+                "name": "text",
+                "value": "OpenAI"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:66"
+          },
+          "name": "I should see \"OpenAI\" in the page",
+          "result": {
+            "duration": 12.23688292503357,
+            "error_message": [
+              "Traceback (most recent call last):",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/model.py\", line 1329, in run",
+              "    match.run(runner.context)",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/matchers.py\", line 98, in run",
+              "    self.func(context, *args, **kwargs)",
+              "  File \"features/steps/navigation_steps.py\", line 79, in step_impl",
+              "    assert context.history.errors() == []",
+              "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "AssertionError",
+              "",
+              "Captured logging:",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).."
+            ],
+            "status": "failed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/navigation.feature:13",
+      "name": "Use browser history",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/navigation.feature:14",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 0.00038504600524902344,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/navigation.feature:15",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "github.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:24"
+          },
+          "name": "I navigate to \"github.com\"",
+          "result": {
+            "duration": 7.826543807983398,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "And",
+          "location": "features/navigation.feature:16",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/navigation_steps.py:38"
+          },
+          "name": "I go back in browser history",
+          "result": {
+            "duration": 10.203248977661133,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/navigation.feature:17",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "google.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:81"
+          },
+          "name": "I should be on \"google.com\"",
+          "result": {
+            "duration": 8.0673987865448,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/navigation.feature:18",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/navigation_steps.py:52"
+          },
+          "name": "I go forward in browser history",
+          "result": {
+            "duration": 17.811439037322998,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/navigation.feature:19",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "github.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:81"
+          },
+          "name": "I should be on \"github.com\"",
+          "result": {
+            "duration": 10.946425914764404,
+            "error_message": [
+              "Traceback (most recent call last):",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/model.py\", line 1329, in run",
+              "    match.run(runner.context)",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/matchers.py\", line 98, in run",
+              "    self.func(context, *args, **kwargs)",
+              "  File \"features/steps/navigation_steps.py\", line 94, in step_impl",
+              "    assert context.history.errors() == []",
+              "          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "AssertionError",
+              "",
+              "Captured logging:",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).."
+            ],
+            "status": "failed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    }
+  ],
+  "keyword": "Feature",
+  "location": "features/navigation.feature:1",
+  "name": "Browser Navigation",
+  "status": "failed",
+  "tags": []
+},
+
+{
+  "description": [
+    "As a user",
+    "I want to perform searches in the browser",
+    "So that I can find relevant information"
+  ],
+  "elements": [
+    {
+      "keyword": "Scenario",
+      "location": "features/browser_search.feature:6",
+      "name": "Search on Google",
+      "status": "passed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/browser_search.feature:7",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 8.606910705566406e-05,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/browser_search.feature:8",
+          "match": {
+            "arguments": [
+              {
+                "name": "query",
+                "value": "OpenAI"
+              }
+            ],
+            "location": "features/steps/browser_steps.py:13"
+          },
+          "name": "I search for \"OpenAI\"",
+          "result": {
+            "duration": 6.29425048828125e-05,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/browser_search.feature:9",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:24"
+          },
+          "name": "I should see search results",
+          "result": {
+            "duration": 26.752603769302368,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/browser_search.feature:10",
+          "match": {
+            "arguments": [
+              {
+                "name": "expected_url",
+                "value": "openai.com"
+              }
+            ],
+            "location": "features/steps/browser_steps.py:38"
+          },
+          "name": "the first result should contain \"openai.com\"",
+          "result": {
+            "duration": 9.226799011230469e-05,
+            "status": "passed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/browser_search.feature:12",
+      "name": "Search with Images",
+      "status": "passed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/browser_search.feature:13",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 7.772445678710938e-05,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/browser_search.feature:14",
+          "match": {
+            "arguments": [
+              {
+                "name": "query",
+                "value": "Nvidia"
+              }
+            ],
+            "location": "features/steps/browser_steps.py:18"
+          },
+          "name": "I search for \"Nvidia\" with vision enabled",
+          "result": {
+            "duration": 6.389617919921875e-05,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/browser_search.feature:15",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:43"
+          },
+          "name": "I should see search results with images",
+          "result": {
+            "duration": 25.554280042648315,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/browser_search.feature:16",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:57"
+          },
+          "name": "I should see the Nvidia logo",
+          "result": {
+            "duration": 0.00013971328735351562,
+            "status": "passed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    }
+  ],
+  "keyword": "Feature",
+  "location": "features/browser_search.feature:1",
+  "name": "Browser Search Functionality",
+  "status": "passed",
+  "tags": []
+},
+
+{
+  "description": [
+    "As a user",
+    "I want to verify visual elements on websites",
+    "So that I can ensure proper content display"
+  ],
+  "elements": [
+    {
+      "keyword": "Scenario",
+      "location": "features/visual.feature:6",
+      "name": "Verify company logos",
+      "status": "passed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/visual.feature:7",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "apple.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:5"
+          },
+          "name": "I am on \"apple.com\"",
+          "result": {
+            "duration": 15.528915882110596,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:8",
+          "match": {
+            "arguments": [
+              {
+                "name": "company",
+                "value": "Apple"
+              }
+            ],
+            "location": "features/steps/visual_steps.py:5"
+          },
+          "name": "I should see the company logo for Apple",
+          "result": {
+            "duration": 4.569216966629028,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/visual.feature:9",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "microsoft.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:24"
+          },
+          "name": "I navigate to \"microsoft.com\"",
+          "result": {
+            "duration": 12.615624189376831,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:10",
+          "match": {
+            "arguments": [
+              {
+                "name": "company",
+                "value": "Microsoft"
+              }
+            ],
+            "location": "features/steps/visual_steps.py:5"
+          },
+          "name": "I should see the company logo for Microsoft",
+          "result": {
+            "duration": 4.609431028366089,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/visual.feature:11",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "google.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:24"
+          },
+          "name": "I navigate to \"google.com\"",
+          "result": {
+            "duration": 5.326435089111328,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:12",
+          "match": {
+            "arguments": [
+              {
+                "name": "company",
+                "value": "Google"
+              }
+            ],
+            "location": "features/steps/visual_steps.py:5"
+          },
+          "name": "I should see the company logo for Google",
+          "result": {
+            "duration": 7.14006495475769,
+            "status": "passed"
+          },
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/visual.feature:14",
+      "name": "Check image content",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/visual.feature:15",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:7"
+          },
+          "name": "I am on the Google homepage",
+          "result": {
+            "duration": 0.00011181831359863281,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "When",
+          "location": "features/visual.feature:16",
+          "match": {
+            "arguments": [
+              {
+                "name": "query",
+                "value": "Eiffel Tower"
+              }
+            ],
+            "location": "features/steps/browser_steps.py:18"
+          },
+          "name": "I search for \"Eiffel Tower\" with vision enabled",
+          "result": {
+            "duration": 8.797645568847656e-05,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:17",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/browser_steps.py:43"
+          },
+          "name": "I should see search results with images",
+          "result": {
+            "duration": 11.612565994262695,
+            "error_message": [
+              "Traceback (most recent call last):",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/model.py\", line 1329, in run",
+              "    match.run(runner.context)",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/matchers.py\", line 98, in run",
+              "    self.func(context, *args, **kwargs)",
+              "  File \"features/steps/browser_steps.py\", line 55, in step_impl",
+              "    assert context.history.final_result() is not None",
+              "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "AssertionError",
+              "",
+              "Captured logging:",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).."
+            ],
+            "status": "failed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/visual.feature:18",
+          "name": "I should see images of the Eiffel Tower",
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/visual.feature:19",
+          "name": "I search for \"Golden Gate Bridge\" with vision enabled",
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:20",
+          "name": "I should see images of the Golden Gate Bridge",
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    },
+    {
+      "keyword": "Scenario",
+      "location": "features/visual.feature:22",
+      "name": "Verify page layout",
+      "status": "failed",
+      "steps": [
+        {
+          "keyword": "Given",
+          "location": "features/visual.feature:23",
+          "match": {
+            "arguments": [
+              {
+                "name": "url",
+                "value": "github.com"
+              }
+            ],
+            "location": "features/steps/navigation_steps.py:5"
+          },
+          "name": "I am on \"github.com\"",
+          "result": {
+            "duration": 15.333019733428955,
+            "status": "passed"
+          },
+          "step_type": "given"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:24",
+          "match": {
+            "arguments": [
+              {
+                "name": "element",
+                "value": "navigation bar at the top"
+              }
+            ],
+            "location": "features/steps/interaction_steps.py:76"
+          },
+          "name": "I should see a page element: navigation bar at the top",
+          "result": {
+            "duration": 4.96423602104187,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/visual.feature:25",
+          "match": {
+            "arguments": [
+              {
+                "name": "element",
+                "value": "search bar"
+              }
+            ],
+            "location": "features/steps/interaction_steps.py:76"
+          },
+          "name": "I should see a page element: search bar",
+          "result": {
+            "duration": 8.004164934158325,
+            "status": "passed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "When",
+          "location": "features/visual.feature:26",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/visual_steps.py:35"
+          },
+          "name": "I switch to dark mode",
+          "result": {
+            "duration": 27.595887899398804,
+            "status": "passed"
+          },
+          "step_type": "when"
+        },
+        {
+          "keyword": "Then",
+          "location": "features/visual.feature:27",
+          "match": {
+            "arguments": [],
+            "location": "features/steps/visual_steps.py:49"
+          },
+          "name": "the background should be dark",
+          "result": {
+            "duration": 23.08497190475464,
+            "error_message": [
+              "Traceback (most recent call last):",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/model.py\", line 1329, in run",
+              "    match.run(runner.context)",
+              "  File \"/Users/ashitaatri/Documents/browser-use-gherkin/.venv/lib/python3.11/site-packages/behave/matchers.py\", line 98, in run",
+              "    self.func(context, *args, **kwargs)",
+              "  File \"features/steps/visual_steps.py\", line 62, in step_impl",
+              "    assert context.history.errors() == []",
+              "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "AssertionError",
+              "",
+              "Captured logging:",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota)..",
+              "WARNING:langchain_google_genai.chat_models:Retrying langchain_google_genai.chat_models._achat_with_retry.<locals>._achat_with_retry in 2.0 seconds as it raised ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).."
+            ],
+            "status": "failed"
+          },
+          "step_type": "then"
+        },
+        {
+          "keyword": "And",
+          "location": "features/visual.feature:28",
+          "name": "text should be light colored",
+          "step_type": "then"
+        }
+      ],
+      "tags": [],
+      "type": "scenario"
+    }
+  ],
+  "keyword": "Feature",
+  "location": "features/visual.feature:1",
+  "name": "Visual Recognition",
+  "status": "failed",
+  "tags": []
+}
+]

@@ -3,3 +3,8 @@ pyperclip==1.9.0
 gradio==5.10.0
 json-repair
 langchain-mistralai==0.2.4
+behave==1.2.6
+behave-html-formatter==0.9.10
+selenium>=4.16.0
+webdriver-manager>=4.0.1
+asyncio==3.4.3
