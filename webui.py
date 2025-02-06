@@ -92,7 +92,8 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        html_output
 ):
     global _global_agent_state
     _global_agent_state.clear_stop()  # Clear any previous stop requests
@@ -123,6 +124,7 @@ async def run_browser_agent(
             api_key=llm_api_key,
         )
         if agent_type == "org":
+            logger.info(f"🟢 In org agent")
             final_result, errors, model_actions, model_thoughts, trace_file, history_file = await run_org_agent(
                 llm=llm,
                 use_own_browser=use_own_browser,
@@ -141,6 +143,7 @@ async def run_browser_agent(
                 tool_calling_method=tool_calling_method
             )
         elif agent_type == "custom":
+            logger.info(f"🟢 In custom agent")
             final_result, errors, model_actions, model_thoughts, trace_file, history_file = await run_custom_agent(
                 llm=llm,
                 use_own_browser=use_own_browser,
@@ -157,7 +160,8 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_calling_method=tool_calling_method
+                tool_calling_method=tool_calling_method,
+                html_output=html_output
             )
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
@@ -181,7 +185,8 @@ async def run_browser_agent(
             trace_file,
             history_file,
             gr.update(value="Stop", interactive=True),  # Re-enable stop button
-            gr.update(interactive=True)    # Re-enable run button
+            gr.update(interactive=True),    # Re-enable run button
+            model_thoughts
         )
 
     except gr.Error:
@@ -281,7 +286,7 @@ async def run_org_agent(
 
         trace_file = get_latest_files(save_trace_path)
 
-        return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), history_file
+        return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), model_actions
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -314,7 +319,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        html_output
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state
@@ -371,7 +377,8 @@ async def run_custom_agent(
             agent_prompt_class=CustomAgentMessagePrompt,
             max_actions_per_step=max_actions_per_step,
             agent_state=_global_agent_state,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            html_output=html_output
         )
         history = await agent.run(max_steps=max_steps)
 
@@ -385,7 +392,7 @@ async def run_custom_agent(
 
         trace_file = get_latest_files(save_trace_path)        
 
-        return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), history_file
+        return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), history_file, final_result
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -424,9 +431,11 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    html_output
 ):
     global _global_agent_state
+    logger.info(f"🟢 In first function")
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
     if not headless:
@@ -452,11 +461,13 @@ async def run_with_stream(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            html_output=html_output
         )
         # Add HTML content at the start of the result array
         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
-        yield [html_content] + list(result)
+        logger.info(f"🟢 {result}")
+        yield [html_content] + list(result) + [gr.update(value=result[len(result)-1], interactive=False)]
     else:
         try:
             _global_agent_state.clear_stop()
@@ -484,10 +495,12 @@ async def run_with_stream(
                     max_steps=max_steps,
                     use_vision=use_vision,
                     max_actions_per_step=max_actions_per_step,
-                    tool_calling_method=tool_calling_method
+                    tool_calling_method=tool_calling_method,
+                    html_output=html_output
                 )
             )
 
+            logger.info(f"🟢 In second function")
             # Initialize values for streaming
             html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
             final_result = errors = model_actions = model_thoughts = ""
@@ -497,6 +510,7 @@ async def run_with_stream(
             # Periodically update the stream while the agent task is running
             while not agent_task.done():
                 try:
+                    gr.update()
                     encoded_screenshot = await capture_screenshot(_global_browser_context)
                     if encoded_screenshot is not None:
                         html_content = f'<img src="data:image/jpeg;base64,{encoded_screenshot}" style="width:{stream_vw}vw; height:{stream_vh}vh ; border:1px solid #ccc;">'
@@ -507,6 +521,7 @@ async def run_with_stream(
 
                 if _global_agent_state and _global_agent_state.is_stop_requested():
                     yield [
+                        html_content,
                         html_content,
                         final_result,
                         errors,
@@ -521,6 +536,7 @@ async def run_with_stream(
                     break
                 else:
                     yield [
+                        html_content,
                         html_content,
                         final_result,
                         errors,
@@ -780,12 +796,29 @@ def create_ui(config, theme_name="Ocean"):
                     value=config['task'],
                     info="Describe what you want the agent to do",
                 )
+                
+                workplan_task = gr.Textbox(
+                    label="Soc 2 Type || Engagement Creation",
+                    visible=False,
+                    # value="go to app.fieldguide.io and type cameron+demofirm@fieldguide.io as the username and uqv-bfz.pcr8zjx6CXP as the password. Then create a new standard engagement by choosing a demo client and writing a name. When that's complete, create the engagement."
+                    value="go to app.fieldguide.io and type cameron+demofirm@fieldguide.io as the username and uqv-bfz.pcr8zjx6CXP as the password. Then create a new standard engagement by choosing a demo client and writing and naming it Soc 2 demo. Choose the Soc 2 Type || template. When that's complete, create the engagement."
+                )
+
+                
+                
                 add_infos = gr.Textbox(
                     label="Additional Information",
                     lines=3,
                     placeholder="Add any helpful context or instructions...",
                     info="Optional hints to help the LLM complete the task",
                 )
+
+                with gr.Row():
+                    prompt_lib_1 = gr.Button("Soc 2 Type || Engagement Creation", variant="primary", scale=2)
+                    prompt_lib_2 = gr.Button("Soc 2 Type || Engagement Creation", variant="primary", scale=2)
+                    prompt_lib_3 = gr.Button("Soc 2 Type || Engagement Creation", variant="primary", scale=2)
+                    prompt_lib_4 = gr.Button("Soc 2 Type || Engagement Creation", variant="primary", scale=2)
+
 
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
@@ -795,6 +828,12 @@ def create_ui(config, theme_name="Ocean"):
                     browser_view = gr.HTML(
                         value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
                         label="Live Browser View",
+                )
+                    html_output = gr.Textbox(  # Add this new component
+                        label="HTML Output",
+                        value="Waiting for browser session...",
+                        lines=10,
+                        max_lines=20,
                 )
 
             with gr.TabItem("📁 Configuration", id=5):
@@ -874,26 +913,26 @@ def create_ui(config, theme_name="Ocean"):
                     outputs=[errors_output, stop_button, run_button],
                 )
 
-                # Run button click handler
-                run_button.click(
+                prompt_lib_1.click(
                     fn=run_with_stream,
-                        inputs=[
-                            agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
-                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
-                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
-                        ],
+                    inputs=[
+                        agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
+                        use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
+                        save_recording_path, save_agent_history_path, save_trace_path,
+                        enable_recording, workplan_task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, html_output
+                    ],
                     outputs=[
-                        browser_view,           # Browser view
-                        final_result_output,    # Final result
-                        errors_output,          # Errors
-                        model_actions_output,   # Model actions
-                        model_thoughts_output,  # Model thoughts
-                        recording_display,      # Latest recording
-                        trace_file,             # Trace file
-                        agent_history_file,     # Agent history file
-                        stop_button,            # Stop button
-                        run_button              # Run button
+                        browser_view,
+                        final_result_output,
+                        errors_output,
+                        model_actions_output,
+                        model_thoughts_output,
+                        recording_display,
+                        trace_file,
+                        agent_history_file,
+                        stop_button,
+                        run_button,
+                        html_output
                     ],
                 )
 
