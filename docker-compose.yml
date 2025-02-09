@@ -3,11 +3,13 @@ services:
     platform: linux/amd64
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ${DOCKERFILE:-Dockerfile}
+      args:
+        TARGETPLATFORM: ${TARGETPLATFORM:-linux/amd64}
     ports:
       - "7788:7788"  # Gradio default port
       - "6080:6080"  # noVNC web interface
-      - "5900:5900"  # VNC port
+      - "5901:5901"  # VNC port
       - "9222:9222"  # Chrome remote debugging port
     environment:
       - OPENAI_ENDPOINT=${OPENAI_ENDPOINT:-https://api.openai.com/v1}
@@ -42,7 +44,7 @@ services:
     tmpfs:
       - /tmp
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "5900"]
+      test: ["CMD", "nc", "-z", "localhost", "5901"]
       interval: 10s
       timeout: 5s
       retries: 3
