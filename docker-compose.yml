@@ -1,9 +1,10 @@
 services:
   browser-use-webui:
-    platform: linux/amd64
+    platform: linux/arm64
     build:
       context: .
       dockerfile: Dockerfile
+    image: browser-use-webui:arm64
     ports:
       - "7788:7788"  # Gradio default port
       - "6080:6080"  # noVNC web interface
@@ -20,7 +21,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - BROWSER_USE_LOGGING_LEVEL=${BROWSER_USE_LOGGING_LEVEL:-info}
       - ANONYMIZED_TELEMETRY=false
-      - CHROME_PATH=/usr/bin/google-chrome
+      - CHROME_PATH=/usr/bin/chromium
       - CHROME_USER_DATA=/app/data/chrome_data
       - CHROME_PERSISTENT_SESSION=${CHROME_PERSISTENT_SESSION:-false}
       - DISPLAY=:99
