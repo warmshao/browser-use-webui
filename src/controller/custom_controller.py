@@ -19,7 +19,7 @@ from browser_use.controller.views import (
     SendKeysAction,
     SwitchTabAction,
 )
-from src.controller.views import CoordinatesAction
+from src.controller.views import CoordinatesAction, ClickAction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,13 +46,14 @@ class CustomController(Controller):
             return ActionResult(extracted_content=f"Moving mouse to position ({x}, {y})")
 
         @self.registry.action("Click page on some coordinates")
-        async def click_page(browser: BrowserContext, coordinates: CoordinatesAction):
-            if not coordinates or not coordinates.get("x") or not coordinates.get("y"):
+        async def click_page(browser: BrowserContext, action: ClickAction):
+            if not action or not action.get("x") or not action.get("y"):
                 return ActionResult(extracted_content="No coordinates provided")
-            x = coordinates.get("x")
-            y = coordinates.get("y")
+            x = action.get("x")
+            y = action.get("y")
+            button = action.get("button", "left")
             page = await browser.get_current_page()
-            await page.mouse.click(x, y)
+            await page.mouse.click(x, y, button=button)
             return ActionResult(extracted_content=f"Clicking on position ({x}, {y})")
 
         @self.registry.action("Type some text on playwright page")
