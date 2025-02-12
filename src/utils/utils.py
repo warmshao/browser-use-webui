@@ -32,7 +32,13 @@ def get_llm_model(provider: str, **kwargs):
     """
     rate_limit_rps = kwargs.get("rate_limit_rps", 1.0)
     rate_limit_bucket = kwargs.get("rate_limit_bucket", 10)
-    
+    # Create rate limiter
+    rate_limiter = InMemoryRateLimiter(
+        requests_per_second=rate_limit_rps,
+        check_every_n_seconds=0.1,
+        max_bucket_size=rate_limit_bucket
+    )
+
     if provider not in ["ollama"]:
         env_var = f"{provider.upper()}_API_KEY"
         api_key = kwargs.get("api_key", "") or os.getenv(env_var, "")
@@ -46,20 +52,11 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        # Create rate limiter
-        rate_limiter = InMemoryRateLimiter(
-            requests_per_second=rate_limit_rps,
-            check_every_n_seconds=0.1,
-            max_bucket_size=rate_limit_bucket
-        )
-
         return ChatAnthropic(
             model_name=kwargs.get("model_name", "claude-3-5-sonnet-20240620"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
             api_key=api_key,
-            timeout=kwargs.get("timeout", 60),
-            stop_sequences=kwargs.get("stop", []),
             rate_limiter=rate_limiter,
         )
     elif provider == 'mistral':
@@ -72,15 +69,8 @@ def get_llm_model(provider: str, **kwargs):
         else:
             api_key = kwargs.get("api_key")
 
-        # Create rate limiter
-        rate_limiter = InMemoryRateLimiter(
-            requests_per_second=rate_limit_rps,
-            check_every_n_seconds=0.1,
-            max_bucket_size=rate_limit_bucket
-        )
-
         return ChatMistralAI(
-            model_name=kwargs.get("model_name", "mistral-large-latest"),
+            model=kwargs.get("model_name", "mistral-large-latest"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
             api_key=api_key,
@@ -91,13 +81,6 @@ def get_llm_model(provider: str, **kwargs):
             base_url = os.getenv("OPENAI_ENDPOINT", "https://api.openai.com/v1")
         else:
             base_url = kwargs.get("base_url")
-
-        # Create rate limiter
-        rate_limiter = InMemoryRateLimiter(
-            requests_per_second=rate_limit_rps,
-            check_every_n_seconds=0.1,
-            max_bucket_size=rate_limit_bucket
-        )
 
         return ChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
@@ -113,13 +96,6 @@ def get_llm_model(provider: str, **kwargs):
             base_url = kwargs.get("base_url")
 
         if kwargs.get("model_name", "deepseek-chat") == "deepseek-reasoner":
-            # Create rate limiter
-            rate_limiter = InMemoryRateLimiter(
-                requests_per_second=rate_limit_rps,
-                check_every_n_seconds=0.1,
-                max_bucket_size=rate_limit_bucket
-            )
-
             return DeepSeekR1ChatOpenAI(
                 model=kwargs.get("model_name", "deepseek-reasoner"),
                 temperature=kwargs.get("temperature", 0.0),
@@ -128,12 +104,6 @@ def get_llm_model(provider: str, **kwargs):
                 rate_limiter=rate_limiter,
             )
         else:
-            # Create rate limiter
-            rate_limiter = InMemoryRateLimiter(
-                requests_per_second=rate_limit_rps,
-                check_every_n_seconds=0.1,
-                max_bucket_size=rate_limit_bucket
-            )
 
             return ChatOpenAI(
                 model=kwargs.get("model_name", "deepseek-chat"),
@@ -143,17 +113,11 @@ def get_llm_model(provider: str, **kwargs):
                 rate_limiter=rate_limiter,
             )
     elif provider == "google":
-        # Create rate limiter
-        rate_limiter = InMemoryRateLimiter(
-            requests_per_second=rate_limit_rps,
-            check_every_n_seconds=0.1,
-            max_bucket_size=rate_limit_bucket
-        )
 
         return ChatGoogleGenerativeAI(
             model=kwargs.get("model_name", "gemini-2.0-flash-exp"),
             temperature=kwargs.get("temperature", 0.0),
-            api_key=api_key,
+            google_api_key=api_key,
             rate_limiter=rate_limiter,
         )
     elif provider == "ollama":
@@ -163,12 +127,6 @@ def get_llm_model(provider: str, **kwargs):
             base_url = kwargs.get("base_url")
 
         if "deepseek-r1" in kwargs.get("model_name", "qwen2.5:7b"):
-            # Create rate limiter
-            rate_limiter = InMemoryRateLimiter(
-                requests_per_second=rate_limit_rps,
-                check_every_n_seconds=0.1,
-                max_bucket_size=rate_limit_bucket
-            )
 
             return DeepSeekR1ChatOllama(
                 model=kwargs.get("model_name", "deepseek-r1:14b"),
@@ -178,12 +136,6 @@ def get_llm_model(provider: str, **kwargs):
                 rate_limiter=rate_limiter,
             )
         else:
-            # Create rate limiter
-            rate_limiter = InMemoryRateLimiter(
-                requests_per_second=rate_limit_rps,
-                check_every_n_seconds=0.1,
-                max_bucket_size=rate_limit_bucket
-            )
 
             return ChatOllama(
                 model=kwargs.get("model_name", "qwen2.5:7b"),
@@ -199,12 +151,6 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
         api_version = kwargs.get("api_version", "") or os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
-        # Create rate limiter
-        rate_limiter = InMemoryRateLimiter(
-            requests_per_second=rate_limit_rps,
-            check_every_n_seconds=0.1,
-            max_bucket_size=rate_limit_bucket
-        )
         return AzureChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
             temperature=kwargs.get("temperature", 0.0),
