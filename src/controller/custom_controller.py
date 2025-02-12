@@ -19,6 +19,7 @@ from browser_use.controller.views import (
     SendKeysAction,
     SwitchTabAction,
 )
+from src.controller.views import MouseMoveAction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,14 @@ class CustomController(Controller):
 
     def _register_custom_actions(self):
         """Register all custom browser actions"""
+
+        @self.registry.action("Move mouse to a specific position on playwright page")
+        async def move_mouse(browser: BrowserContext, coordinates: MouseMoveAction):
+            x = coordinates.get("x", 0)
+            y = coordinates.get("y", 0)
+            page = await browser.get_current_page()
+            await page.mouse.move(x, y)
+            return ActionResult(extracted_content=f"Moving mouse to position ({x}, {y})")
 
         @self.registry.action("Copy text to clipboard")
         def copy_to_clipboard(text: str):
