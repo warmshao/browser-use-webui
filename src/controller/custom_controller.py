@@ -19,7 +19,7 @@ from browser_use.controller.views import (
     SendKeysAction,
     SwitchTabAction,
 )
-from src.controller.views import MouseMoveAction
+from src.controller.views import CoordinatesAction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,25 @@ class CustomController(Controller):
         """Register all custom browser actions"""
 
         @self.registry.action("Move mouse to a specific position on playwright page")
-        async def move_mouse(browser: BrowserContext, coordinates: MouseMoveAction):
-            x = coordinates.get("x", 0)
-            y = coordinates.get("y", 0)
+        async def move_mouse(browser: BrowserContext, coordinates: CoordinatesAction):
+            if not coordinates or not coordinates.get("x") or not coordinates.get("y"):
+                return ActionResult(extracted_content="No coordinates provided")
+            x = coordinates.get("x")
+            y = coordinates.get("y")
             page = await browser.get_current_page()
             await page.mouse.move(x, y)
             return ActionResult(extracted_content=f"Moving mouse to position ({x}, {y})")
+
+        @self.registry.action("Click page on some coordinates")
+        async def click_page(browser: BrowserContext, coordinates: CoordinatesAction):
+            if not coordinates or not coordinates.get("x") or not coordinates.get("y"):
+                return ActionResult(extracted_content="No coordinates provided")
+            x = coordinates.get("x")
+            y = coordinates.get("y")
+            page = await browser.get_current_page()
+            await page.mouse.click(x, y)
+            return ActionResult(extracted_content=f"Clicking on position ({x}, {y})")
+
 
         @self.registry.action("Copy text to clipboard")
         def copy_to_clipboard(text: str):
