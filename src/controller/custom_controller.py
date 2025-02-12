@@ -19,7 +19,7 @@ from browser_use.controller.views import (
     SendKeysAction,
     SwitchTabAction,
 )
-from src.controller.views import CoordinatesAction, ClickAction
+from src.controller.views import CoordinatesAction, ClickAction, TypeAction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class CustomController(Controller):
             return ActionResult(extracted_content=f"Double clicking on position ({x}, {y})")
 
         @self.registry.action("Type some text on playwright page")
-        async def type_text(browser: BrowserContext, text: str):
+        async def type_text(browser: BrowserContext, params: TypeAction):
             page = await browser.get_current_page()
 
             # focus on element via mouse click
@@ -76,9 +76,8 @@ class CustomController(Controller):
             for _ in range(10):
                 await page.keyboard.press('Backspace')
 
-            await page.keyboard.type(text, delay=100)
+            await page.keyboard.type(params.text, delay=100)
 
-            await page.keyboard.type(text)
             return ActionResult(extracted_content=f"Typed text: {text}")
 
 
