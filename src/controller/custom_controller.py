@@ -55,6 +55,21 @@ class CustomController(Controller):
             await page.mouse.click(x, y)
             return ActionResult(extracted_content=f"Clicking on position ({x}, {y})")
 
+        @self.registry.action("Type some text on playwright page")
+        async def type_text(browser: BrowserContext, text: str):
+            page = await browser.get_current_page()
+
+            # focus on element via mouse click
+
+            # type backspace ten times to clear the field
+            for _ in range(10):
+                await page.keyboard.press('Backspace')
+
+            await page.keyboard.type(text, delay=100)
+
+            await page.keyboard.type(text)
+            return ActionResult(extracted_content=f"Typed text: {text}")
+
 
         @self.registry.action("Copy text to clipboard")
         def copy_to_clipboard(text: str):
