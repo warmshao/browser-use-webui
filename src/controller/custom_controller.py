@@ -56,6 +56,16 @@ class CustomController(Controller):
             await page.mouse.click(x, y, button=button)
             return ActionResult(extracted_content=f"Clicking on position ({x}, {y})")
 
+        @self.registry.action("Double click page on some coordinates")
+        async def double_click_page(browser: BrowserContext, action: ClickAction):
+            if not action or not action.get("x") or not action.get("y"):
+                return ActionResult(extracted_content="No coordinates provided")
+            x = action.get("x")
+            y = action.get("y")
+            page = await browser.get_current_page()
+            await page.mouse.dblclick(x, y, button=action.button)
+            return ActionResult(extracted_content=f"Double clicking on position ({x}, {y})")
+
         @self.registry.action("Type some text on playwright page")
         async def type_text(browser: BrowserContext, text: str):
             page = await browser.get_current_page()
