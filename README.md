@@ -107,14 +107,6 @@ cp .env.example .env
 ```
 Edit `.env` with your preferred text editor and add your API keys
 
-feature/arm64-support
-4. **Access the Application:**
-   - WebUI: `http://localhost:7788`
-   - VNC Viewer (to see browser interactions): `http://localhost:6080/vnc.html`
-   - Direct VNC access is available on port 5901 (especially useful for Mac users)
-   
-   Default VNC password is "vncpassword". You can change it by setting the `VNC_PASSWORD` environment variable in your `.env` file.
-
 3. Run with Docker:
 ```bash
 # Build and start the container with default settings (browser closes after AI tasks)

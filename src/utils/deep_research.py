@@ -269,6 +269,23 @@ Provide your output as a JSON formatted list. Each item in the list must adhere 
         logger.info("\nFinish Searching, Start Generating Report...")
 
         # 5. Report Generation in Markdown (or JSON if you prefer)
+        return await generate_final_report(task, history_infos, save_dir, llm)
+
+    except Exception as e:
+        logger.error(f"Deep research Error: {e}")
+        return await generate_final_report(task, history_infos, save_dir, llm, str(e))
+    finally:
+        if browser:
+            await browser.close()
+        if browser_context:
+            await browser_context.close()
+        logger.info("Browser closed.")
+
+async def generate_final_report(task, history_infos, save_dir, llm, error_msg=None):
+    """Generate report from collected information with error handling"""
+    try:
+        logger.info("\nAttempting to generate final report from collected data...")
+        
         writer_system_prompt = """
         You are a **Deep Researcher** and a professional report writer tasked with creating polished, high-quality reports that fully meet the user's needs, based on the user's instructions and the relevant information provided. You will write the report using Markdown format, ensuring it is both informative and visually appealing.
 
@@ -314,21 +331,21 @@ Provide your output as a JSON formatted list. Each item in the list must adhere 
             logger.info(ai_report_msg.reasoning_content)
             logger.info("🤯 End Report Deep Thinking")
         report_content = ai_report_msg.content
-        # Remove ```markdown or ``` at the *very beginning* and ``` at the *very end*, with optional whitespace
         report_content = re.sub(r"^```\s*markdown\s*|^\s*```|```\s*$", "", report_content, flags=re.MULTILINE)
         report_content = report_content.strip()
+
+        # Add error notification to the report
+        if error_msg:
+            report_content = f"## ⚠️ Research Incomplete - Partial Results\n" \
+                            f"**The research process was interrupted by an error:** {error_msg}\n\n" \
+                            f"{report_content}"
+            
         report_file_path = os.path.join(save_dir, "final_report.md")
         with open(report_file_path, "w", encoding="utf-8") as f:
             f.write(report_content)
         logger.info(f"Save Report at: {report_file_path}")
         return report_content, report_file_path
 
-    except Exception as e:
-        logger.error(f"Deep research Error: {e}")
-        return "", None
-    finally:
-        if browser:
-            await browser.close()
-        if browser_context:
-            await browser_context.close()
-        logger.info("Browser closed.")
+    except Exception as report_error:
+        logger.error(f"Failed to generate partial report: {report_error}")
+        return f"Error generating report: {str(report_error)}", None
