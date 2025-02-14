@@ -1,6 +1,5 @@
 import logging
 import pdb
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,10 +7,9 @@ import argparse
 import asyncio
 import glob
 import os
+import json
 
 logger = logging.getLogger(__name__)
-
-import json
 
 import gradio as gr
 from browser_use.agent.service import Agent
@@ -23,10 +21,10 @@ from browser_use.browser.context import (
 from gradio.themes import Base, Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft
 from langchain_ollama import ChatOllama
 from playwright.async_api import async_playwright
-from pymilvus import DataType, MilvusClient, Function, FunctionType
-from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.schema import AIMessage
 
 from src.agent.custom_agent import CustomAgent
 from src.agent.custom_prompts import CustomAgentMessagePrompt, CustomSystemPrompt
@@ -35,6 +33,7 @@ from src.browser.custom_context import BrowserContextConfig, CustomBrowserContex
 from src.controller.custom_controller import CustomController
 from src.utils import utils
 from src.utils.agent_state import AgentState
+from src.utils.milvus_storage import storage
 from src.utils.default_config_settings import (
     default_config,
     load_config_from_file,
@@ -43,8 +42,6 @@ from src.utils.default_config_settings import (
     update_ui_from_config,
 )
 from src.utils.utils import capture_screenshot, get_latest_files, update_model_dropdown
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import AIMessage
 
 # Global variables for persistence
 _global_browser = None
@@ -52,10 +49,6 @@ _global_browser_context = None
 
 # Create the global agent state instance
 _global_agent_state = AgentState()
-
-# Initialize encoder and Milvus client
-encoder = SentenceTransformer('all-MiniLM-L6-v2')
-milvus_client = MilvusClient(uri="http://localhost:19530")
 
 class NewsItem(BaseModel):
     date: str
@@ -65,128 +58,50 @@ class NewsItem(BaseModel):
 class NewsOutput(BaseModel):
     latest_news: List[NewsItem]
 
-# Initialize Milvus collection if it doesn't exist
-def init_milvus_collection():
+def save_agent_result_to_milvus(final_result, url=""):
+    """Store agent results in Milvus with appropriate metadata."""
     try:
-        if not milvus_client.has_collection('web_data'):
-            # Create schema
-            schema = milvus_client.create_schema()
-            schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True, auto_id=True)
-            schema.add_field(field_name="url", datatype=DataType.VARCHAR, max_length=500)
-            schema.add_field(field_name="content", datatype=DataType.VARCHAR, max_length=65535, enable_analyzer=True)
-            schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
-            schema.add_field(field_name="embedding", datatype=DataType.FLOAT_VECTOR, dim=384)  # MiniLM dimension
-            
-            # Add BM25 function for full-text search
-            bm25_function = Function(
-                name="content_bm25_emb",
-                input_field_names=["content"],
-                output_field_names=["sparse"],
-                function_type=FunctionType.BM25,
-            )
-            schema.add_function(bm25_function)
-            
-            # Prepare index parameters
-            index_params = milvus_client.prepare_index_params()
-            index_params.add_index(
-                field_name="embedding",
-                index_type="AUTOINDEX",
-                metric_type="COSINE"
-            )
-            index_params.add_index(
-                field_name="sparse",
-                index_type="AUTOINDEX",
-                metric_type="BM25"
-            )
-            
-            # Create collection
-            milvus_client.create_collection(
-                collection_name='web_data',
-                schema=schema,
-                index_params=index_params
-            )
-            
-            # Load collection for searching
-            milvus_client.load_collection('web_data')
-            return "Milvus collection 'web_data' created successfully"
+        # Try to parse the result if it's a string
+        if isinstance(final_result, str):
+            try:
+                content = json.loads(final_result)
+            except json.JSONDecodeError:
+                content = final_result
         else:
-            milvus_client.load_collection('web_data')
-            return "Milvus collection 'web_data' already exists"
+            content = final_result
+
+        # Store with metadata
+        metadata = {
+            "source": "agent_result",
+            "timestamp": utils.get_current_timestamp()
+        }
+        
+        return storage.store(
+            content=content,
+            url=url,
+            content_type="agent_result",
+            metadata=metadata
+        )
     except Exception as e:
-        return f"Error initializing Milvus collection: {str(e)}"
-
-# Initialize collection on startup
-init_result = init_milvus_collection()
-logger.info(init_result)
-
-def vector_search(query: str, limit: int = 3, use_vector: bool = True):
-    try:
-        if use_vector:
-            query_embedding = encoder.encode(query).tolist()
-            results = milvus_client.search(
-                collection_name='web_data',
-                data=[query_embedding],
-                anns_field="embedding",
-                params={
-                    "metric_type": "COSINE",
-                    "params": {"nprobe": 10}
-                },
-                limit=limit,
-                output_fields=["url", "content"]
-            )
-        else:
-            results = milvus_client.search(
-                collection_name='web_data',
-                data=[query],
-                anns_field="sparse",
-                params={
-                    "drop_ratio_search": 0.2
-                },
-                limit=limit,
-                output_fields=["url", "content"]
-            )
-
-        processed_results = []
-        for hits in results:
-            for hit in hits:
-                entity = hit.get('entity', {})
-                content = entity.get('content', '')
-                url = entity.get('url', '')
-                score = 1 - hit.get('distance', 0) if use_vector else hit.get('score', 0)
-                
-                try:
-                    # Try to parse as NewsOutput
-                    news_data = NewsOutput.model_validate_json(content)
-                    formatted_content = []
-                    for item in news_data.latest_news:
-                        formatted_content.append(
-                            f"📅 {item.date}\n"
-                            f"📰 {item.title}\n"
-                            f"🔗 {item.link}"
-                        )
-                    content = "\n\n".join(formatted_content)
-                except:
-                    # If not valid JSON, use as is
-                    pass
-                
-                processed_results.append({
-                    "content": content,
-                    "url": url,
-                    "score": round(score, 4)
-                })
-        return processed_results
-    except Exception as e:
-        logger.error(f"Search error: {e}")
-        return []
+        return f"Error saving to Milvus: {str(e)}"
 
 def get_milvus_response(query, llm_provider=None, llm_model_name=None, llm_temperature=None, llm_base_url=None, llm_api_key=None):
+    """Get a response using RAG with Milvus."""
     # Get relevant context from Milvus
-    results = vector_search(query, limit=3)  # Get top 3 results for more context
+    results = storage.search(query, limit=3)
     if not results:
         return "I don't have any relevant information to answer your question."
     
     # Format context from results
-    context = "\n\n".join([r['content'] for r in results])
+    context_parts = []
+    for r in results:
+        content = r['content']
+        if isinstance(content, dict):
+            # Format dictionary content nicely
+            content = json.dumps(content, indent=2)
+        context_parts.append(f"Content: {content}\nSource: {r['url']}\nType: {r['type']}")
+    
+    context = "\n\n".join(context_parts)
     
     # Get LLM using provided configuration or fallback to env vars
     llm = utils.get_llm_model(
@@ -212,7 +127,6 @@ Answer:"""
         if isinstance(llm, ChatGoogleGenerativeAI):
             llm_response = llm.invoke(prompt).content
         else:
-            # For other LLM types (OpenAI, etc.)
             response = llm.invoke(prompt)
             if isinstance(response, AIMessage):
                 llm_response = response.content
@@ -222,70 +136,12 @@ Answer:"""
         # Add source information
         source_info = "\n\nSources:"
         for r in results:
-            source_info += f"\n- {r['url']} (Relevance: {r['score']})"
+            source_info += f"\n- {r['url']} (Relevance: {r['score']}, Type: {r['type']})"
         
-        # Ensure both parts are strings before concatenation
         return str(llm_response) + str(source_info)
     except Exception as e:
         logger.error(f"Error getting LLM response: {e}")
         return f"Error: Could not generate response. Please try again. ({str(e)})"
-
-def save_agent_result_to_milvus(final_result, url=""):
-    try:
-        # Try to parse the JSON result
-        if isinstance(final_result, str):
-            try:
-                data = json.loads(final_result)
-            except json.JSONDecodeError:
-                # If not JSON, try to parse the text format
-                # First, clean up the text by removing any prefixes
-                text = final_result.replace("Latest News from Python.org:", "").replace("Latest News:", "").strip()
-                
-                # Split into individual news items
-                items = []
-                for line in text.split(". "):
-                    if not line.strip():
-                        continue
-                    # Extract number prefix if it exists
-                    line = line.strip()
-                    if line[0].isdigit() and line[1] == '.':
-                        line = line[2:].strip()
-                    
-                    # Try to extract date from parentheses at the end
-                    if '(' in line and ')' in line:
-                        title = line[:line.rfind('(')].strip()
-                        date = line[line.rfind('(')+1:line.rfind(')')].strip()
-                        items.append({
-                            "date": date,
-                            "title": title,
-                            "link": ""
-                        })
-                
-                if items:
-                    data = {"latest_news": items}
-                else:
-                    return f"Error: Could not parse result format: {final_result}"
-        else:
-            data = final_result
-
-        # Create NewsOutput from data
-        news_output = NewsOutput.model_validate(data)
-        
-        # Store the clean JSON
-        content = news_output.model_dump_json()
-        embedding = encoder.encode(content).tolist()
-        
-        milvus_client.insert(
-            collection_name='web_data',
-            data=[{
-                'url': url or "python.org",
-                'content': content,
-                'embedding': embedding
-            }]
-        )
-        return f"Successfully saved {len(news_output.latest_news)} news items to Milvus"
-    except Exception as e:
-        return f"Error saving to Milvus: {str(e)}"
 
 async def stop_agent():
     """Request the agent to stop and update UI with enhanced feedback"""

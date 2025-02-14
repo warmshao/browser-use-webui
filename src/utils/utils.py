@@ -241,3 +241,8 @@ async def capture_screenshot(browser_context):
         return encoded
     except Exception as e:
         return None
+
+def get_current_timestamp() -> str:
+    """Get current timestamp in ISO format."""
+    from datetime import datetime
+    return datetime.now().isoformat()
