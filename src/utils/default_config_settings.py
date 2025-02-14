@@ -12,8 +12,8 @@ def default_config():
         "max_actions_per_step": 10,
         "use_vision": True,
         "tool_calling_method": "auto",
-        "llm_provider": "openai",
-        "llm_model_name": "gpt-4o",
+        "llm_provider": "mistral",
+        "llm_model_name": "mistral-small-latest",
         "llm_temperature": 1.0,
         "llm_base_url": "",
         "llm_api_key": "",
@@ -27,7 +27,7 @@ def default_config():
         "save_recording_path": "./tmp/record_videos",
         "save_trace_path": "./tmp/traces",
         "save_agent_history_path": "./tmp/agent_history",
-        "task": "go to google.com and type 'OpenAI' click search and give me the first url",
+        "task": "Go to python.org and extract the latest news",
     }
 
 
