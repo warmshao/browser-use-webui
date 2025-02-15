@@ -449,11 +449,16 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    username,
+    password
 ):
     global _global_agent_state
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
+    # Modify the task description if username and password are provided
+    if username and password:
+        task = f"{task} Credentials {username} and {password}"
     if not headless:
         result = await run_browser_agent(
             agent_type=agent_type,
@@ -836,7 +841,30 @@ def create_ui(config, theme_name="Ocean"):
                     placeholder="Add any helpful context or instructions...",
                     info="Optional hints to help the LLM complete the task",
                 )
+                show_credentials = gr.Checkbox(
+                    label="Use Credentials for Authentication",
+                    value=False,
+                    info="Check to enter username and password",
+                )
+                username = gr.Textbox(
+                    label="Username",
+                    placeholder="Enter your username...",
+                    info="Username for authentication",
+                    visible=False,
+                )
+                password = gr.Textbox(
+                    label="Password",
+                    type="password",
+                    placeholder="Enter your password...",
+                    info="Password for authentication",
+                    visible=False,
 
+                )
+                show_credentials.change(
+                    lambda show: (gr.update(visible=show), gr.update(visible=show)),
+                    inputs=show_credentials,
+                    outputs=[username, password]
+                )
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
                     stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
@@ -902,7 +930,7 @@ def create_ui(config, theme_name="Ocean"):
                             agent_type, llm_provider, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
                             use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                             save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method,username,password
                         ],
                     outputs=[
                         browser_view,           # Browser view
