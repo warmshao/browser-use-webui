@@ -32,21 +32,6 @@ def create_message_content(text, image_path=None):
         })
     return content
 
-def get_env_value(key, provider):
-    env_mappings = {
-        "openai": {"api_key": "OPENAI_API_KEY", "base_url": "OPENAI_ENDPOINT"},
-        "azure_openai": {"api_key": "AZURE_OPENAI_API_KEY", "base_url": "AZURE_OPENAI_ENDPOINT"},
-        "google": {"api_key": "GOOGLE_API_KEY"},
-        "deepseek": {"api_key": "DEEPSEEK_API_KEY", "base_url": "DEEPSEEK_ENDPOINT"},
-        "mistral": {"api_key": "MISTRAL_API_KEY", "base_url": "MISTRAL_ENDPOINT"},
-        "alibaba": {"api_key": "ALIBABA_API_KEY", "base_url": "ALIBABA_ENDPOINT"},
-        "moonshot":{"api_key": "MOONSHOT_API_KEY", "base_url": "MOONSHOT_ENDPOINT"},
-    }
-
-    if provider in env_mappings and key in env_mappings[provider]:
-        return os.getenv(env_mappings[provider][key], "")
-    return ""
-
 def test_llm(config, query, image_path=None, system_message=None):
     from src.utils import utils
 
@@ -69,8 +54,8 @@ def test_llm(config, query, image_path=None, system_message=None):
         provider=config.provider,
         model_name=config.model_name,
         temperature=config.temperature,
-        base_url=config.base_url or get_env_value("base_url", config.provider),
-        api_key=config.api_key or get_env_value("api_key", config.provider)
+        base_url=config.base_url,
+        api_key=config.api_key
     )
 
     # Prepare messages for non-Ollama models
@@ -130,7 +115,7 @@ if __name__ == "__main__":
     # test_openai_model()
     # test_google_model()
     # test_azure_openai_model()
-    #test_deepseek_model()
+    # test_deepseek_model()
     # test_ollama_model()
     test_deepseek_r1_model()
     # test_deepseek_r1_ollama_model()
