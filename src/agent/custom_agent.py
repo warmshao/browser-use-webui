@@ -22,19 +22,23 @@ from browser_use.browser.context import BrowserContext
 from browser_use.browser.views import BrowserStateHistory
 from browser_use.controller.service import Controller
 from browser_use.telemetry.views import (
-	AgentEndTelemetryEvent,
-	AgentRunTelemetryEvent,
-	AgentStepTelemetryEvent,
+    AgentEndTelemetryEvent,
+    AgentRunTelemetryEvent,
+    AgentStepTelemetryEvent,
 )
 from browser_use.utils import time_execution_async
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     BaseMessage,
+    HumanMessage,
+    AIMessage
 )
+from browser_use.agent.prompts import PlannerPrompt
+
 from json_repair import repair_json
 from src.utils.agent_state import AgentState
 
-from .custom_massage_manager import CustomMassageManager
+from .custom_message_manager import CustomMessageManager
 from .custom_views import CustomAgentOutput, CustomAgentStepInfo
 
 logger = logging.getLogger(__name__)
@@ -50,34 +54,42 @@ class CustomAgent(Agent):
             browser_context: BrowserContext | None = None,
             controller: Controller = Controller(),
             use_vision: bool = True,
+            use_vision_for_planner: bool = False,
             save_conversation_path: Optional[str] = None,
-            max_failures: int = 5,
+            save_conversation_path_encoding: Optional[str] = 'utf-8',
+            max_failures: int = 3,
             retry_delay: int = 10,
             system_prompt_class: Type[SystemPrompt] = SystemPrompt,
             agent_prompt_class: Type[AgentMessagePrompt] = AgentMessagePrompt,
             max_input_tokens: int = 128000,
             validate_output: bool = False,
+            message_context: Optional[str] = None,
+            generate_gif: bool | str = True,
+            sensitive_data: Optional[Dict[str, str]] = None,
+            available_file_paths: Optional[list[str]] = None,
             include_attributes: list[str] = [
-                "title",
-                "type",
-                "name",
-                "role",
-                "tabindex",
-                "aria-label",
-                "placeholder",
-                "value",
-                "alt",
-                "aria-expanded",
+                'title',
+                'type',
+                'name',
+                'role',
+                'tabindex',
+                'aria-label',
+                'placeholder',
+                'value',
+                'alt',
+                'aria-expanded',
             ],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
             tool_call_in_content: bool = True,
-            agent_state: AgentState = None,
             initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
             # Cloud Callbacks
             register_new_step_callback: Callable[['BrowserState', 'AgentOutput', int], None] | None = None,
             register_done_callback: Callable[['AgentHistoryList'], None] | None = None,
             tool_calling_method: Optional[str] = 'auto',
+            page_extraction_llm: Optional[BaseChatModel] = None,
+            planner_llm: Optional[BaseChatModel] = None,
+            planner_interval: int = 1,  # Run planner every N steps
     ):
         super().__init__(
             task=task,
@@ -86,12 +98,18 @@ class CustomAgent(Agent):
             browser_context=browser_context,
             controller=controller,
             use_vision=use_vision,
+            use_vision_for_planner=use_vision_for_planner,
             save_conversation_path=save_conversation_path,
+            save_conversation_path_encoding=save_conversation_path_encoding,
             max_failures=max_failures,
             retry_delay=retry_delay,
             system_prompt_class=system_prompt_class,
             max_input_tokens=max_input_tokens,
             validate_output=validate_output,
+            message_context=message_context,
+            generate_gif=generate_gif,
+            sensitive_data=sensitive_data,
+            available_file_paths=available_file_paths,
             include_attributes=include_attributes,
             max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
@@ -99,7 +117,9 @@ class CustomAgent(Agent):
             initial_actions=initial_actions,
             register_new_step_callback=register_new_step_callback,
             register_done_callback=register_done_callback,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            planner_llm=planner_llm,
+            planner_interval=planner_interval
         )
         if self.model_name in ["deepseek-reasoner"] or "deepseek-r1" in self.model_name:
             # deepseek-reasoner does not support function calling
@@ -108,15 +128,16 @@ class CustomAgent(Agent):
             self.max_input_tokens = 64000
         else:
             self.use_deepseek_r1 = False
-        
+
         # record last actions
         self._last_actions = None
+        # record extract content
+        self.extracted_content = ""
         # custom new info
         self.add_infos = add_infos
-        # agent_state for Stop
-        self.agent_state = agent_state
+
         self.agent_prompt_class = agent_prompt_class
-        self.message_manager = CustomMassageManager(
+        self.message_manager = CustomMessageManager(
             llm=self.llm,
             task=self.task,
             action_descriptions=self.controller.registry.get_prompt_description(),
@@ -125,7 +146,9 @@ class CustomAgent(Agent):
             max_input_tokens=self.max_input_tokens,
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
-            max_actions_per_step=self.max_actions_per_step
+            max_actions_per_step=self.max_actions_per_step,
+            message_context=self.message_context,
+            sensitive_data=self.sensitive_data
         )
 
     def _setup_action_models(self) -> None:
@@ -181,19 +204,16 @@ class CustomAgent(Agent):
         if future_plans and "None" not in future_plans:
             step_info.future_plans = future_plans
 
+        logger.info(f"🧠 All Memory: \n{step_info.memory}")
+
     @time_execution_async("--get_next_action")
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
         """Get next action from LLM based on current state"""
-        messages_to_process = (
-            self.message_manager.merge_successive_human_messages(input_messages)
-            if self.use_deepseek_r1
-            else input_messages
-        )
 
-        ai_message = self.llm.invoke(messages_to_process)
+        ai_message = self.llm.invoke(input_messages)
         self.message_manager._add_message_with_tokens(ai_message)
 
-        if self.use_deepseek_r1:
+        if hasattr(ai_message, "reasoning_content"):
             logger.info("🤯 Start Deep Thinking: ")
             logger.info(ai_message.reasoning_content)
             logger.info("🤯 End Deep Thinking")
@@ -207,7 +227,7 @@ class CustomAgent(Agent):
         ai_content = repair_json(ai_content)
         parsed_json = json.loads(ai_content)
         parsed: AgentOutput = self.AgentOutput(**parsed_json)
-        
+
         if parsed is None:
             logger.debug(ai_message.content)
             raise ValueError('Could not parse response.')
@@ -216,8 +236,62 @@ class CustomAgent(Agent):
         parsed.action = parsed.action[: self.max_actions_per_step]
         self._log_response(parsed)
         self.n_steps += 1
-        
+
         return parsed
+
+    async def _run_planner(self) -> Optional[str]:
+        """Run the planner to analyze state and suggest next steps"""
+        # Skip planning if no planner_llm is set
+        if not self.planner_llm:
+            return None
+
+        # Create planner message history using full message history
+        planner_messages = [
+            PlannerPrompt(self.action_descriptions).get_system_message(),
+            *self.message_manager.get_messages()[1:],  # Use full message history except the first
+        ]
+
+        if not self.use_vision_for_planner and self.use_vision:
+            last_state_message = planner_messages[-1]
+            # remove image from last state message
+            new_msg = ''
+            if isinstance(last_state_message.content, list):
+                for msg in last_state_message.content:
+                    if msg['type'] == 'text':
+                        new_msg += msg['text']
+                    elif msg['type'] == 'image_url':
+                        continue
+            else:
+                new_msg = last_state_message.content
+
+            planner_messages[-1] = HumanMessage(content=new_msg)
+
+        # Get planner output
+        response = await self.planner_llm.ainvoke(planner_messages)
+        plan = response.content
+        last_state_message = planner_messages[-1]
+        # remove image from last state message
+        if isinstance(last_state_message.content, list):
+            for msg in last_state_message.content:
+                if msg['type'] == 'text':
+                    msg['text'] += f"\nPlanning Agent outputs plans:\n {plan}\n"
+        else:
+            last_state_message.content += f"\nPlanning Agent outputs plans:\n {plan}\n "
+
+        try:
+            plan_json = json.loads(plan.replace("```json", "").replace("```", ""))
+            logger.info(f'📋 Plans:\n{json.dumps(plan_json, indent=4)}')
+
+            if hasattr(response, "reasoning_content"):
+                logger.info("🤯 Start Planning Deep Thinking: ")
+                logger.info(response.reasoning_content)
+                logger.info("🤯 End Planning Deep Thinking")
+
+        except json.JSONDecodeError:
+            logger.info(f'📋 Plans:\n{plan}')
+        except Exception as e:
+            logger.debug(f'Error parsing planning analysis: {e}')
+            logger.info(f'📋 Plans: {plan}')
 
     @time_execution_async("--step")
     async def step(self, step_info: Optional[CustomAgentStepInfo] = None) -> None:
@@ -226,21 +300,30 @@ class CustomAgent(Agent):
         state = None
         model_output = None
         result: list[ActionResult] = []
+        actions: list[ActionModel] = []
 
         try:
-            state = await self.browser_context.get_state(use_vision=self.use_vision)
-            self.message_manager.add_state_message(state, self._last_actions, self._last_result, step_info)
+            state = await self.browser_context.get_state()
+            self._check_if_stopped_or_paused()
+
+            self.message_manager.add_state_message(state, self._last_actions, self._last_result, step_info,
+                                                   self.use_vision)
+
+            # Run planner at specified intervals if planner is configured
+            if self.planner_llm and self.n_steps % self.planning_interval == 0:
+                await self._run_planner()
             input_messages = self.message_manager.get_messages()
+            self._check_if_stopped_or_paused()
             try:
                 model_output = await self.get_next_action(input_messages)
                 if self.register_new_step_callback:
                     self.register_new_step_callback(state, model_output, self.n_steps)
                 self.update_step_info(model_output, step_info)
-                logger.info(f"🧠 All Memory: \n{step_info.memory}")
                 self._save_conversation(input_messages, model_output)
                 if self.model_name != "deepseek-reasoner":
                     # remove prev message
                     self.message_manager._remove_state_message_by_index(-1)
+                self._check_if_stopped_or_paused()
             except Exception as e:
                 # model call failed, remove last state message from history
                 self.message_manager._remove_state_message_by_index(-1)
@@ -248,22 +331,31 @@ class CustomAgent(Agent):
 
             actions: list[ActionModel] = model_output.action
             result: list[ActionResult] = await self.controller.multi_act(
-                actions, self.browser_context
+                actions,
+                self.browser_context,
+                page_extraction_llm=self.page_extraction_llm,
+                sensitive_data=self.sensitive_data,
+                check_break_if_paused=lambda: self._check_if_stopped_or_paused(),
+                available_file_paths=self.available_file_paths,
             )
             if len(result) != len(actions):
                 # I think something changes, such information should let LLM know
                 for ri in range(len(result), len(actions)):
                     result.append(ActionResult(extracted_content=None,
-                                                include_in_memory=True,
-                                                error=f"{actions[ri].model_dump_json(exclude_unset=True)} is Failed to execute. \
+                                               include_in_memory=True,
+                                               error=f"{actions[ri].model_dump_json(exclude_unset=True)} is Failed to execute. \
                                                     Something new appeared after action {actions[len(result) - 1].model_dump_json(exclude_unset=True)}",
-                                                is_done=False))
-            if len(actions) == 0:
-                # TODO: fix no action case
-                result = [ActionResult(is_done=True, extracted_content=step_info.memory, include_in_memory=True)]
+                                               is_done=False))
+            for ret_ in result:
+                if ret_.extracted_content and "Extracted page" in ret_.extracted_content:
+                    # record every extracted page
+                    self.extracted_content += ret_.extracted_content
             self._last_result = result
             self._last_actions = actions
             if len(result) > 0 and result[-1].is_done:
+                if not self.extracted_content:
+                    self.extracted_content = step_info.memory
+                result[-1].extracted_content = self.extracted_content
                 logger.info(f"📄 Result: {result[-1].extracted_content}")
 
             self.consecutive_failures = 0
@@ -296,7 +388,14 @@ class CustomAgent(Agent):
 
             # Execute initial actions if provided
             if self.initial_actions:
-                result = await self.controller.multi_act(self.initial_actions, self.browser_context, check_for_new_elements=False)
+                result = await self.controller.multi_act(
+                    self.initial_actions,
+                    self.browser_context,
+                    check_for_new_elements=False,
+                    page_extraction_llm=self.page_extraction_llm,
+                    check_break_if_paused=lambda: self._check_if_stopped_or_paused(),
+                    available_file_paths=self.available_file_paths,
+                )
                 self._last_result = result
 
             step_info = CustomAgentStepInfo(
@@ -310,17 +409,6 @@ class CustomAgent(Agent):
             )
 
             for step in range(max_steps):
-                # 1) Check if stop requested
-                if self.agent_state and self.agent_state.is_stop_requested():
-                    logger.info("🛑 Stop requested by user")
-                    self._create_stop_history_item()
-                    break
-
-                # 2) Store last valid state before step
-                if self.browser_context and self.agent_state:
-                    state = await self.browser_context.get_state(use_vision=self.use_vision)
-                    self.agent_state.set_last_valid_state(state)
-
                 if self._too_many_failures():
                     break
 
@@ -338,6 +426,10 @@ class CustomAgent(Agent):
                     break
             else:
                 logger.info("❌ Failed to complete task in maximum steps")
+                if not self.extracted_content:
+                    self.history.history[-1].result[-1].extracted_content = step_info.memory
+                else:
+                    self.history.history[-1].result[-1].extracted_content = self.extracted_content
 
             return self.history
 
@@ -365,76 +457,18 @@ class CustomAgent(Agent):
 
                 self.create_history_gif(output_path=output_path)
 
-    def _create_stop_history_item(self):
-        """Create a history item for when the agent is stopped."""
-        try:
-            # Attempt to retrieve the last valid state from agent_state
-            state = None
-            if self.agent_state:
-                last_state = self.agent_state.get_last_valid_state()
-                if last_state:
-                    # Convert to BrowserStateHistory
-                    state = BrowserStateHistory(
-                        url=getattr(last_state, 'url', ""),
-                        title=getattr(last_state, 'title', ""),
-                        tabs=getattr(last_state, 'tabs', []),
-                        interacted_element=[None],
-                        screenshot=getattr(last_state, 'screenshot', None)
-                    )
-                else:
-                    state = self._create_empty_state()
-            else:
-                state = self._create_empty_state()
-
-            # Create a final item in the agent history indicating done
-            stop_history = AgentHistory(
-                model_output=None,
-                state=state,
-                result=[ActionResult(extracted_content=None, error=None, is_done=True)]
-            )
-            self.history.history.append(stop_history)
-
-        except Exception as e:
-            logger.error(f"Error creating stop history item: {e}")
-            # Create empty state as fallback
-            state = self._create_empty_state()
-            stop_history = AgentHistory(
-                model_output=None,
-                state=state,
-                result=[ActionResult(extracted_content=None, error=None, is_done=True)]
-            )
-            self.history.history.append(stop_history)
-
-    def _convert_to_browser_state_history(self, browser_state):
-        return BrowserStateHistory(
-            url=getattr(browser_state, 'url', ""),
-            title=getattr(browser_state, 'title', ""),
-            tabs=getattr(browser_state, 'tabs', []),
-            interacted_element=[None],
-            screenshot=getattr(browser_state, 'screenshot', None)
-        )
-
-    def _create_empty_state(self):
-        return BrowserStateHistory(
-            url="",
-            title="",
-            tabs=[],
-            interacted_element=[None],
-            screenshot=None
-        )
-
     def create_history_gif(
-        self,
-        output_path: str = 'agent_history.gif',
-        duration: int = 3000,
-        show_goals: bool = True,
-        show_task: bool = True,
-        show_logo: bool = False,
-        font_size: int = 40,
-        title_font_size: int = 56,
-        goal_font_size: int = 44,
-        margin: int = 40,
-        line_spacing: float = 1.5,
+            self,
+            output_path: str = 'agent_history.gif',
+            duration: int = 3000,
+            show_goals: bool = True,
+            show_task: bool = True,
+            show_logo: bool = False,
+            font_size: int = 40,
+            title_font_size: int = 56,
+            goal_font_size: int = 44,
+            margin: int = 40,
+            line_spacing: float = 1.5,
     ) -> None:
         """Create a GIF from the agent's history with overlaid task and goal text."""
         if not self.history.history:

@@ -3,7 +3,6 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
-    netcat-traditional \
     gnupg \
     curl \
     unzip \
@@ -47,8 +46,8 @@ RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
     && git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify \
     && ln -s /opt/novnc/vnc.html /opt/novnc/index.html
 
-# Set platform for ARM64 compatibility
-ARG TARGETPLATFORM=linux/amd64
+# Set platform explicitly for ARM64
+ARG TARGETPLATFORM=linux/arm64
 
 # Set up working directory
 WORKDIR /app
@@ -57,10 +56,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright and browsers with system dependencies
+# Install Playwright and browsers with system dependencies optimized for ARM64
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install --with-deps chromium
-RUN playwright install-deps
+RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pip install playwright && \
+    playwright install --with-deps chromium
 
 # Copy the application code
 COPY . .

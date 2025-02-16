@@ -11,9 +11,9 @@ This project builds upon the foundation of the [browser-use](https://github.com/
 
 We would like to officially thank [WarmShao](https://github.com/warmshao) for his contribution to this project.
 
-**WebUI:** is built on Gradio and supports a most of `browser-use` functionalities. This UI is designed to be user-friendly and enables easy interaction with the browser agent.
+**WebUI:** is built on Gradio and supports most of `browser-use` functionalities. This UI is designed to be user-friendly and enables easy interaction with the browser agent.
 
-**Expanded LLM Support:** We've integrated support for various Large Language Models (LLMs), including: Gemini, OpenAI, Azure OpenAI, Anthropic, DeepSeek, Ollama etc. And we plan to add support for even more models in the future.
+**Expanded LLM Support:** We've integrated support for various Large Language Models (LLMs), including: Google, OpenAI, Azure OpenAI, Anthropic, DeepSeek, Ollama etc. And we plan to add support for even more models in the future.
 
 **Custom Browser Support:** You can use your own browser with our tool, eliminating the need to re-login to sites or deal with other authentication challenges. This feature also supports high-definition screen recording.
 
@@ -21,80 +21,118 @@ We would like to officially thank [WarmShao](https://github.com/warmshao) for hi
 
 <video src="https://github.com/user-attachments/assets/56bc7080-f2e3-4367-af22-6bf2245ff6cb" controls="controls">Your browser does not support playing this video!</video>
 
-## Installation Options
+## Installation Guide
+
+### Prerequisites
+- Python 3.11 or higher
+- Git (for cloning the repository)
 
 ### Option 1: Local Installation
 
 Read the [quickstart guide](https://docs.browser-use.com/quickstart#prepare-the-environment) or follow the steps below to get started.
 
-> Python 3.11 or higher is required.
+#### Step 1: Clone the Repository
+```bash
+git clone https://github.com/browser-use/web-ui.git
+cd web-ui
+```
 
-First, we recommend using [uv](https://docs.astral.sh/uv/) to setup the Python environment.
+#### Step 2: Set Up Python Environment
+We recommend using [uv](https://docs.astral.sh/uv/) for managing the Python environment.
 
+Using uv (recommended):
 ```bash
 uv venv --python 3.11
 ```
 
-and activate it with:
-
+Activate the virtual environment:
+- Windows (Command Prompt):
+```cmd
+.venv\Scripts\activate
+```
+- Windows (PowerShell):
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+- macOS/Linux:
 ```bash
 source .venv/bin/activate
 ```
 
-Install the dependencies:
-
+#### Step 3: Install Dependencies
+Install Python packages:
 ```bash
 uv pip install -r requirements.txt
 ```
 
-Then install playwright:
-
+Install Playwright:
 ```bash
 playwright install
 ```
 
+#### Step 4: Configure Environment
+1. Create a copy of the example environment file:
+- Windows (Command Prompt):
+```bash
+copy .env.example .env
+```
+- macOS/Linux/Windows (PowerShell):
+```bash
+cp .env.example .env
+```
+2. Open `.env` in your preferred text editor and add your API keys and other settings
+
 ### Option 2: Docker Installation
 
-1. **Prerequisites:**
-   - Docker and Docker Compose installed on your system
-   - Git to clone the repository
+#### Prerequisites
+- Docker and Docker Compose installed
+  - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (For Windows/macOS)
+  - [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/) (For Linux)
 
-2. **Setup:**
-   ```bash
-   # Clone the repository
-   git clone https://github.com/browser-use/web-ui.git
-   cd web-ui
+#### Installation Steps
+1. Clone the repository:
+```bash
+git clone https://github.com/browser-use/web-ui.git
+cd web-ui
+```
 
-   # Copy and configure environment variables
-   cp .env.example .env
-   # Edit .env with your preferred text editor and add your API keys
-   ```
+2. Create and configure environment file:
+- Windows (Command Prompt):
+```bash
+copy .env.example .env
+```
+- macOS/Linux/Windows (PowerShell):
+```bash
+cp .env.example .env
+```
+Edit `.env` with your preferred text editor and add your API keys
 
-3. **Run with Docker:**
-   ```bash
-   # Build and start the container with default settings (browser closes after AI tasks)
-   docker compose up --build
+3. Run with Docker:
+```bash
+# Build and start the container with default settings (browser closes after AI tasks)
+docker compose up --build
+```
+```bash
+# Or run with persistent browser (browser stays open between AI tasks)
+CHROME_PERSISTENT_SESSION=true docker compose up --build
+```
 
-   # Or run with persistent browser (browser stays open between AI tasks)
-   CHROME_PERSISTENT_SESSION=true docker compose up --build
-   ```
 
-4. **Access the Application:**
-   - WebUI: `http://localhost:7788`
-   - VNC Viewer (to see browser interactions): `http://localhost:6080/vnc.html`
-   
-   Default VNC password is "vncpassword". You can change it by setting the `VNC_PASSWORD` environment variable in your `.env` file.
-
+4. Access the Application:
+- Web Interface: Open `http://localhost:7788` in your browser
+- VNC Viewer (for watching browser interactions): Open `http://localhost:6080/vnc.html`
+  - Default VNC password: "youvncpassword"
+  - Can be changed by setting `VNC_PASSWORD` in your `.env` file
 
 ## Usage
 
 ### Local Setup
-1.  Copy `.env.example` to `.env` and set your environment variables, including API keys for the LLM. `cp .env.example .env`
-2.  **Run the WebUI:**
+1.  **Run the WebUI:**
+    After completing the installation steps above, start the application:
     ```bash
     python webui.py --ip 127.0.0.1 --port 7788
     ```
-4. WebUI options:
+2. WebUI options:
    - `--ip`: The IP address to bind the WebUI to. Default is `127.0.0.1`.
    - `--port`: The port to bind the WebUI to. Default is `7788`.
    - `--theme`: The theme for the user interface. Default is `Ocean`.
@@ -146,7 +184,11 @@ playwright install
      VNC_PASSWORD=your_vnc_password  # Optional, defaults to "vncpassword"
      ```
 
-2. **Browser Persistence Modes:**
+2. **Platform Support:**
+   - Supports both AMD64 and ARM64 architectures
+   - For ARM64 systems (e.g., Apple Silicon Macs), the container will automatically use the appropriate image
+
+3. **Browser Persistence Modes:**
    - **Default Mode (CHROME_PERSISTENT_SESSION=false):**
      - Browser opens and closes with each AI task
      - Clean state for each interaction
@@ -158,12 +200,13 @@ playwright install
      - Allows viewing previous AI interactions
      - Set in `.env` file or via environment variable when starting container
 
-3. **Viewing Browser Interactions:**
+4. **Viewing Browser Interactions:**
    - Access the noVNC viewer at `http://localhost:6080/vnc.html`
    - Enter the VNC password (default: "vncpassword" or what you set in VNC_PASSWORD)
+   - Direct VNC access available on port 5900 (mapped to container port 5901)
    - You can now see all browser interactions in real-time
 
-4. **Container Management:**
+5. **Container Management:**
    ```bash
    # Start with persistent browser
    CHROME_PERSISTENT_SESSION=true docker compose up -d

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Dict
 
 from browser_use.agent.message_manager.service import MessageManager
 from browser_use.agent.message_manager.views import MessageHistory
@@ -24,7 +24,7 @@ from .custom_prompts import CustomAgentMessagePrompt
 logger = logging.getLogger(__name__)
 
 
-class CustomMassageManager(MessageManager):
+class CustomMessageManager(MessageManager):
     def __init__(
             self,
             llm: BaseChatModel,
@@ -38,7 +38,8 @@ class CustomMassageManager(MessageManager):
             include_attributes: list[str] = [],
             max_error_length: int = 400,
             max_actions_per_step: int = 10,
-            message_context: Optional[str] = None
+            message_context: Optional[str] = None,
+            sensitive_data: Optional[Dict[str, str]] = None,
     ):
         super().__init__(
             llm=llm,
@@ -51,7 +52,8 @@ class CustomMassageManager(MessageManager):
             include_attributes=include_attributes,
             max_error_length=max_error_length,
             max_actions_per_step=max_actions_per_step,
-            message_context=message_context
+            message_context=message_context,
+            sensitive_data=sensitive_data
         )
         self.agent_prompt_class = agent_prompt_class
         # Custom: Move Task info to state_message
@@ -68,7 +70,7 @@ class CustomMassageManager(MessageManager):
         min_message_len = 2 if self.message_context is not None else 1
         
         while diff > 0 and len(self.history.messages) > min_message_len:
-            self.history.remove_message(min_message_len) # alway remove the oldest message
+            self.history.remove_message(min_message_len)  # always remove the oldest message
             diff = self.history.total_tokens - self.max_input_tokens
         
     def add_state_message(
@@ -77,6 +79,7 @@ class CustomMassageManager(MessageManager):
             actions: Optional[List[ActionModel]] = None,
             result: Optional[List[ActionResult]] = None,
             step_info: Optional[AgentStepInfo] = None,
+            use_vision=True,
     ) -> None:
         """Add browser state as human message"""
         # otherwise add state message and result to next message (which will not stay in memory)
@@ -87,7 +90,7 @@ class CustomMassageManager(MessageManager):
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
             step_info=step_info,
-        ).get_user_message()
+        ).get_user_message(use_vision)
         self._add_message_with_tokens(state_message)
     
     def _count_text_tokens(self, text: str) -> int:

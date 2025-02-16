@@ -68,7 +68,7 @@ class DeepSeekR1ChatOpenAI(ChatOpenAI):
         
         response = self.client.chat.completions.create(
             model=self.model_name,
-            messages=messages
+            messages=message_history
         )
 
         reasoning_content = response.choices[0].message.reasoning_content
