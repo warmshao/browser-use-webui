@@ -147,6 +147,11 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 3.  **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
 4.  **Using Your Own Browser(Optional):**
     - Set `CHROME_PATH` to the executable path of your browser and `CHROME_USER_DATA` to the user data directory of your browser. Leave `CHROME_USER_DATA` empty if you want to use local user data.
+      - Ubuntu
+        ```env
+         CHROME_PATH="/usr/bin/google-chrome"
+         CHROME_USER_DATA=${HOME}/.config/google-chrome
+        ```
       - Windows
         ```env
          CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -156,7 +161,7 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
       - Mac
         ```env
          CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-         CHROME_USER_DATA="/Users/YourUsername/Library/Application Support/Google/Chrome"
+         CHROME_USER_DATA="~/Library/Application Support/Google/Chrome/Profile 1"
         ```
     - Close all Chrome windows
     - Open the WebUI in a non-Chrome browser, such as Firefox or Edge. This is important because the persistent browser context will use the Chrome data when running the agent.
@@ -225,3 +230,4 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 - [x] **2025/01/26:** Thanks to @vvincent1234. Now browser-use-webui can combine with DeepSeek-r1 to engage in deep thinking!
 - [x] **2025/01/10:** Thanks to @casistack. Now we have Docker Setup option and also Support keep browser open between tasks.[Video tutorial demo](https://github.com/browser-use/web-ui/issues/1#issuecomment-2582511750).
 - [x] **2025/01/06:** Thanks to @richard-devbot. A New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
+
