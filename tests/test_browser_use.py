@@ -128,7 +128,7 @@ async def test_browser_use_custom():
 
     # llm = utils.get_llm_model(
     #     provider="google",
-    #     model_name="gemini-2.0-flash-exp",
+    #     model_name="gemini-2.0-flash",
     #     temperature=1.0,
     #     api_key=os.getenv("GOOGLE_API_KEY", "")
     # )
@@ -193,7 +193,7 @@ async def test_browser_use_custom():
             )
         )
         agent = CustomAgent(
-            task="Search 'Nvidia' and give me the first url",
+            task="Give me stock price of Tesla",
             add_infos="",  # some hints for llm to complete the task
             llm=llm,
             browser=browser,

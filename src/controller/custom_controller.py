@@ -39,7 +39,7 @@ class CustomController(Controller):
             pyperclip.copy(text)
             return ActionResult(extracted_content=text)
 
-        @self.registry.action("Paste text from clipboard", requires_browser=True)
+        @self.registry.action("Paste text from clipboard")
         async def paste_from_clipboard(browser: BrowserContext):
             text = pyperclip.paste()
             # send text to browser
@@ -47,25 +47,3 @@ class CustomController(Controller):
             await page.keyboard.type(text)
 
             return ActionResult(extracted_content=text)
-
-        @self.registry.action(
-            'Extract page content to get the pure text or markdown with links if include_links is set to true',
-            param_model=ExtractPageContentAction,
-            requires_browser=True,
-        )
-        async def extract_content(params: ExtractPageContentAction, browser: BrowserContext):
-            page = await browser.get_current_page()
-            # use jina reader
-            url = page.url
-            jina_url = f"https://r.jina.ai/{url}"
-            await page.goto(jina_url)
-            output_format = 'markdown' if params.include_links else 'text'
-            content = MainContentExtractor.extract(  # type: ignore
-                html=await page.content(),
-                output_format=output_format,
-            )
-            # go back to org url
-            await page.go_back()
-            msg = f'Extracted page content:\n {content}\n'
-            logger.info(msg)
-            return ActionResult(extracted_content=msg)

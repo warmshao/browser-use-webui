@@ -20,7 +20,9 @@ PROVIDER_DISPLAY_NAMES = {
     "azure_openai": "Azure OpenAI",
     "anthropic": "Anthropic",
     "deepseek": "DeepSeek",
-    "google": "Google"
+    "google": "Google",
+    "alibaba": "Alibaba",
+    "moonshot": "MoonShot"
 }
 
 def get_llm_model(provider: str, **kwargs):
@@ -159,18 +161,40 @@ def get_llm_model(provider: str, **kwargs):
             api_key=api_key,
             rate_limiter=rate_limiter,
         )
+    elif provider == "alibaba":
+        if not kwargs.get("base_url", ""):
+            base_url = os.getenv("ALIBABA_ENDPOINT", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        else:
+            base_url = kwargs.get("base_url")
+
+        return ChatOpenAI(
+            model=kwargs.get("model_name", "qwen-plus"),
+            temperature=kwargs.get("temperature", 0.0),
+            base_url=base_url,
+            api_key=api_key,
+        )
+
+    elif provider == "moonshot":
+        return ChatOpenAI(
+            model=kwargs.get("model_name", "moonshot-v1-32k-vision-preview"),
+            temperature=kwargs.get("temperature", 0.0),
+            base_url=os.getenv("MOONSHOT_ENDPOINT"),
+            api_key=os.getenv("MOONSHOT_API_KEY"),
+        )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
-    
+
 # Predefined model names for common providers
 model_names = {
     "anthropic": ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
     "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo", "o3-mini"],
     "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "google": ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-01-21"],
-    "ollama": ["qwen2.5:7b", "llama2:7b", "deepseek-r1:14b", "deepseek-r1:32b"],
+    "google": ["gemini-2.0-flash", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-01-21", "gemini-2.0-pro-exp-02-05"],
+    "ollama": ["qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5-coder:14b", "qwen2.5-coder:32b", "llama2:7b", "deepseek-r1:14b", "deepseek-r1:32b"],
     "azure_openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
-    "mistral": ["pixtral-large-latest", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"]
+    "mistral": ["pixtral-large-latest", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"],
+    "alibaba": ["qwen-plus", "qwen-max", "qwen-turbo", "qwen-long"],
+    "moonshot": ["moonshot-v1-32k-vision-preview", "moonshot-v1-8k-vision-preview"],
 }
 
 # Callback to update the model name dropdown based on the selected provider
