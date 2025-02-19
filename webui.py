@@ -44,6 +44,30 @@ _global_agent = None
 # Create the global agent state instance
 _global_agent_state = AgentState()
 
+def resolve_sensitive_env_variables(text):
+    """
+    Replace environment variable placeholders ($SENSITIVE_*) with their values.
+    Only replaces variables that start with SENSITIVE_.
+    """
+    if not text:
+        return text
+        
+    import re
+    
+    # Find all $SENSITIVE_* patterns
+    env_vars = re.findall(r'\$SENSITIVE_[A-Za-z0-9_]*', text)
+    
+    result = text
+    for var in env_vars:
+        # Remove the $ prefix to get the actual environment variable name
+        env_name = var[1:]  # removes the $
+        env_value = os.getenv(env_name)
+        if env_value is not None:
+            # Replace $SENSITIVE_VAR_NAME with its value
+            result = result.replace(var, env_value)
+        
+    return result
+
 async def stop_agent():
     """Request the agent to stop and update UI with enhanced feedback"""
     global _global_agent_state, _global_browser_context, _global_browser, _global_agent
@@ -140,6 +164,8 @@ async def run_browser_agent(
                 glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
                 + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
             )
+
+        task = resolve_sensitive_env_variables(task)
 
         # Run the agent
         llm = utils.get_llm_model(

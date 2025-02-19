@@ -91,6 +91,20 @@ class CustomAgent(Agent):
             planner_llm: Optional[BaseChatModel] = None,
             planner_interval: int = 1,  # Run planner every N steps
     ):
+
+        # Load sensitive data from environment variables
+        env_sensitive_data = {}
+        for key, value in os.environ.items():
+            if key.startswith('SENSITIVE_'):
+                env_key = key.replace('SENSITIVE_', '', 1).lower()
+                env_sensitive_data[env_key] = value
+    
+        # Merge environment variables with provided sensitive_data
+        if sensitive_data is None:
+            sensitive_data = {}
+        sensitive_data = {**env_sensitive_data, **sensitive_data}  # Provided data takes precedence
+
+
         super().__init__(
             task=task,
             llm=llm,
