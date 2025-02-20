@@ -24,6 +24,7 @@ from browser_use.browser.context import (
 from langchain_ollama import ChatOllama
 from playwright.async_api import async_playwright
 from src.utils.agent_state import AgentState
+from src.utils.llm_providers import MODEL_NAMES
 
 from src.utils import utils
 from src.agent.custom_agent import CustomAgent
@@ -33,7 +34,7 @@ from src.browser.custom_context import BrowserContextConfig, CustomBrowserContex
 from src.controller.custom_controller import CustomController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
 from src.utils.default_config_settings import default_config, load_config_from_file, save_config_to_file, save_current_config, update_ui_from_config
-from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
+from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot, MissingAPIKeyError
 
 
 # Global variables for persistence
@@ -238,8 +239,8 @@ async def run_browser_agent(
             gr.update(interactive=True)    # Re-enable run button
         )
 
-    except gr.Error:
-        raise
+    except MissingAPIKeyError as e:
+        raise gr.Error(e.message())
 
     except Exception as e:
         import traceback
@@ -759,14 +760,14 @@ def create_ui(config, theme_name="Ocean"):
             with gr.TabItem("🔧 LLM Configuration", id=2):
                 with gr.Group():
                     llm_provider = gr.Dropdown(
-                        choices=[provider for provider,model in utils.model_names.items()],
+                        choices=[provider for provider,model in MODEL_NAMES.items()],
                         label="LLM Provider",
                         value=config['llm_provider'],
                         info="Select your preferred language model provider"
                     )
                     llm_model_name = gr.Dropdown(
                         label="Model Name",
-                        choices=utils.model_names['openai'],
+                        choices=MODEL_NAMES['openai'],
                         value=config['llm_model_name'],
                         interactive=True,
                         allow_custom_value=True,  # Allow users to input custom model names
