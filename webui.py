@@ -36,6 +36,8 @@ from src.utils.default_config_settings import default_config, load_config_from_f
 from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot
 
 
+from plugins import load_plugins  # Add this import at the top
+
 # Global variables for persistence
 _global_browser = None
 _global_browser_context = None
@@ -1062,6 +1064,22 @@ def create_ui(config, theme_name="Ocean"):
                     outputs=[config_status]
                 )
 
+
+            # Load and create plugin UIs
+            try:
+                plugin_list = load_plugins()
+                for plugin in plugin_list:
+                    if plugin.is_enabled():
+                        try:
+                            plugin.create_ui(tabs)
+                            logger.info(f"Loaded plugin UI: {plugin.name} v{plugin.version}")
+                        except Exception as e:
+                            logger.error(f"Failed to load UI for plugin {plugin.name}: {str(e)}")
+                            # Continue loading other plugins even if one fails
+                            continue
+            except Exception as e:
+                logger.error(f"Failed to load plugins: {str(e)}")
+                # Continue with the main application even if plugin loading fails
 
         # Attach the callback to the LLM provider dropdown
         llm_provider.change(

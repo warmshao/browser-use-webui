@@ -1,0 +1,13 @@
+name: Mock2 Plugin
+version: 1.0.0
+description: A mock Twitter automation plugin for demonstration purposes
+min_webui_version: 1.0.0
+author: Demo Author
+license: MIT
+
+config:
+  enabled: true
+  mock_delay: 1.0  # Simulated delay in seconds
+
+security:
+  sanitize_all_inputs: true 
