@@ -1,0 +1,13 @@
+[project]
+name = "web-ui"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "browser-use==0.1.29",
+    "gradio==5.10.0",
+    "json-repair>=0.35.0",
+    "langchain-mistralai==0.2.4",
+    "pyperclip==1.9.0",
+]
