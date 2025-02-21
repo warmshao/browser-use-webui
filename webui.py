@@ -143,7 +143,9 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        rate_limit_rps,
+        rate_limit_bucket
 ):
     global _global_agent_state
     _global_agent_state.clear_stop()  # Clear any previous stop requests
@@ -175,6 +177,8 @@ async def run_browser_agent(
             temperature=llm_temperature,
             base_url=llm_base_url,
             api_key=llm_api_key,
+            rate_limit_rps=rate_limit_rps,
+            rate_limit_bucket=rate_limit_bucket
         )
         if agent_type == "org":
             final_result, errors, model_actions, model_thoughts, trace_file, history_file = await run_org_agent(
@@ -482,7 +486,9 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    rate_limit_rps,
+    rate_limit_bucket
 ):
     global _global_agent_state
     stream_vw = 80
@@ -511,7 +517,9 @@ async def run_with_stream(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            rate_limit_rps=rate_limit_rps,
+            rate_limit_bucket=rate_limit_bucket
         )
         # Add HTML content at the start of the result array
         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
@@ -544,7 +552,9 @@ async def run_with_stream(
                     max_steps=max_steps,
                     use_vision=use_vision,
                     max_actions_per_step=max_actions_per_step,
-                    tool_calling_method=tool_calling_method
+                    tool_calling_method=tool_calling_method,
+                    rate_limit_rps=rate_limit_rps,
+                    rate_limit_bucket=rate_limit_bucket
                 )
             )
 
@@ -658,7 +668,7 @@ async def close_global_browser():
         await _global_browser.close()
         _global_browser = None
         
-async def run_deep_search(research_task, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless):
+async def run_deep_search(research_task, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless, rate_limit_rps, rate_limit_bucket):
     from src.utils.deep_research import deep_research
     global _global_agent_state
 
@@ -672,6 +682,8 @@ async def run_deep_search(research_task, max_search_iteration_input, max_query_p
             temperature=llm_temperature,
             base_url=llm_base_url,
             api_key=llm_api_key,
+            rate_limit_rps=rate_limit_rps,
+            rate_limit_bucket=rate_limit_bucket
         )
     markdown_content, file_path = await deep_research(research_task, llm, _global_agent_state,
                                                         max_search_iterations=max_search_iteration_input,
@@ -800,6 +812,19 @@ def create_ui(config, theme_name="Ocean"):
                             type="password",
                             value=config['llm_api_key'],
                             info="Your API key (leave blank to use .env)"
+                        )
+                    with gr.Row():
+                        rate_limit_rps = gr.Number(
+                            label="Requests/sec",
+                            value=config.get('rate_limit_rps', 1),  
+                            precision=1,
+                            info="Max requests per second"
+                        )
+                        rate_limit_bucket = gr.Number(
+                            label="Max Bucket Size",
+                            value=config.get('rate_limit_bucket', 10),
+                            precision=0,
+                            info="Maximum burst capacity"
                         )
 
             # Change event to update context length slider
@@ -958,7 +983,8 @@ def create_ui(config, theme_name="Ocean"):
                             agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
                             use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                             save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method,
+                            rate_limit_rps, rate_limit_bucket
                         ],
                     outputs=[
                         browser_view,           # Browser view
@@ -977,7 +1003,7 @@ def create_ui(config, theme_name="Ocean"):
                 # Run Deep Research
                 research_button.click(
                         fn=run_deep_search,
-                        inputs=[research_task_input, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless],
+                        inputs=[research_task_input, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless, rate_limit_rps, rate_limit_bucket],
                         outputs=[markdown_output_display, markdown_download, stop_research_button, research_button]
                 )
                 # Bind the stop button click event after errors_output is defined
