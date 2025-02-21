@@ -55,17 +55,36 @@ class CustomController(Controller):
         )
         async def extract_content(params: ExtractPageContentAction, browser: BrowserContext):
             page = await browser.get_current_page()
-            # use jina reader
             url = page.url
-            jina_url = f"https://r.jina.ai/{url}"
-            await page.goto(jina_url)
-            output_format = 'markdown' if params.include_links else 'text'
-            content = MainContentExtractor.extract(  # type: ignore
-                html=await page.content(),
-                output_format=output_format,
-            )
-            # go back to org url
-            await page.go_back()
+            
+            # Special handling for X/Twitter
+            if 'x.com' in url or 'twitter.com' in url:
+                # Get tweets directly from the page
+                tweets = await page.query_selector_all('article[data-testid="tweet"]')
+                content = []
+                for tweet in tweets:
+                    try:
+                        author = await tweet.query_selector('div[data-testid="User-Name"]')
+                        text = await tweet.query_selector('div[data-testid="tweetText"]')
+                        if author and text:
+                            author_text = await author.inner_text()
+                            tweet_text = await text.inner_text()
+                            content.append(f"Author: {author_text}\nTweet: {tweet_text}\n")
+                    except Exception as e:
+                        continue
+                content = "\n".join(content) if content else "No tweets found or unable to access content"
+            else:
+                # Use jina reader for other sites
+                jina_url = f"https://r.jina.ai/{url}"
+                await page.goto(jina_url)
+                output_format = 'markdown' if params.include_links else 'text'
+                content = MainContentExtractor.extract(  # type: ignore
+                    html=await page.content(),
+                    output_format=output_format,
+                )
+                # go back to org url
+                await page.go_back()
+            
             msg = f'Extracted page content:\n {content}\n'
             logger.info(msg)
             return ActionResult(extracted_content=msg)

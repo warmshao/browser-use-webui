@@ -13,7 +13,7 @@ def default_config():
         "use_vision": True,
         "tool_calling_method": "auto",
         "llm_provider": "mistral",
-        "llm_model_name": "mistral-small-latest",
+        "llm_model_name": "pixtral-large-latest",
         "llm_temperature": 1.0,
         "llm_base_url": "",
         "llm_api_key": "",
@@ -27,7 +27,11 @@ def default_config():
         "save_recording_path": "./tmp/record_videos",
         "save_trace_path": "./tmp/traces",
         "save_agent_history_path": "./tmp/agent_history",
-        "task": "Go to python.org and extract the latest news",
+        "task": 
+        """Go to https://x.com/search?q=Milvus%20&src=recent_search_click and find the Tweets that talk about Milvus. 
+I only want to have tweets that talk about the Vector Database Milvus. Don't include any other tweets like birds or about photography. 
+Please return 10 tweets in a JSON Format, we have to include tweet text, the tweet url and the tweet author.
+        """,
     }
 
 
