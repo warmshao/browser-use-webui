@@ -4,12 +4,14 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 import requests
+import boto3
 
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
+from langchain_aws import ChatBedrock
 import gradio as gr
 
 from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
@@ -21,7 +23,8 @@ PROVIDER_DISPLAY_NAMES = {
     "deepseek": "DeepSeek",
     "google": "Google",
     "alibaba": "Alibaba",
-    "moonshot": "MoonShot"
+    "moonshot": "MoonShot",
+    "bedrock": "AWS Bedrock"
 }
 
 def get_llm_model(provider: str, **kwargs):
@@ -158,6 +161,21 @@ def get_llm_model(provider: str, **kwargs):
             base_url=os.getenv("MOONSHOT_ENDPOINT"),
             api_key=os.getenv("MOONSHOT_API_KEY"),
         )
+    elif provider == "bedrock":
+        region = kwargs.get("region", "") or os.getenv("AWS_BEDROCK_REGION", "us-west-2")
+
+        session = boto3.Session(region_name=region)
+        bedrock_runtime = session.client(
+            service_name="bedrock-runtime",
+            region_name=region,
+        )
+
+        model_id = kwargs.get("model_name", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+
+        return ChatBedrock(
+            client=bedrock_runtime,
+            model_id=model_id,
+        )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -172,6 +190,7 @@ model_names = {
     "mistral": ["pixtral-large-latest", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"],
     "alibaba": ["qwen-plus", "qwen-max", "qwen-turbo", "qwen-long"],
     "moonshot": ["moonshot-v1-32k-vision-preview", "moonshot-v1-8k-vision-preview"],
+    "bedrock": ["anthropic.claude-3-5-sonnet-20241022-v2:0"]
 }
 
 # Callback to update the model name dropdown based on the selected provider
