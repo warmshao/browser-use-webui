@@ -25,7 +25,7 @@ class CustomAgentBrain(BaseModel):
     task_progress: str
     future_plans: str
     thought: str
-    summary: str
+    summary: str=""
 
 
 class CustomAgentOutput(AgentOutput):

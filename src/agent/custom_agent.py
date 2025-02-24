@@ -245,6 +245,14 @@ class CustomAgent(Agent):
         if parsed is None:
             logger.debug(ai_message.content)
             raise ValueError('Could not parse response.')
+        
+        if len(parsed.action) > 0:
+            first_action = parsed.action[0]
+            if hasattr(first_action, 'go_to_url'):
+                logger.info("Navigation action detected - executing in isolation")
+                parsed.action = [first_action]
+            elif hasattr(first_action, 'done'):
+                parsed.action = [first_action]
 
         # Limit actions to maximum allowed per step
         parsed.action = parsed.action[: self.max_actions_per_step]
@@ -310,6 +318,9 @@ class CustomAgent(Agent):
     @time_execution_async("--step")
     async def step(self, step_info: Optional[CustomAgentStepInfo] = None) -> None:
         """Execute one step of the task"""
+        if not self.browser_context:
+            raise RuntimeError("Browser context not initialized")    
+        
         logger.info(f"\n📍 Step {self.n_steps}")
         state = None
         model_output = None
