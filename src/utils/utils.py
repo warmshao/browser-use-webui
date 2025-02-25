@@ -2,8 +2,9 @@ import base64
 import os
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import requests
+from ollama import ListResponse, list,Client
 
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI
@@ -11,8 +12,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 import gradio as gr
+from src.utils.llm import EnhancedChatOllama, EnhancedChatOpenAI, DeepSeekR1ChatOpenAI
 
-from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
 
 PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
@@ -24,10 +25,38 @@ PROVIDER_DISPLAY_NAMES = {
     "moonshot": "MoonShot"
 }
 
+def get_ollama_models() -> List[str]:
+    """
+    Fetch available models from Ollama server
+    Returns a list of model names or empty list if Ollama is not available
+    """
+    try:
+        response: ListResponse = list()
+        return [model.model for model in response.models]
+    except Exception as e:
+        print(f"Warning: Could not fetch Ollama models: {e}")
+        return []
+
+def update_model_names():
+    """
+    Update the model_names dictionary with current Ollama models
+    """
+    global model_names
+    ollama_models = get_ollama_models()
+    
+    # Create a copy of the original dictionary
+    updated_models = model_names.copy()
+    
+    # Update Ollama models if we successfully fetched them
+    if ollama_models:
+        updated_models["ollama"] = ollama_models
+    
+    return updated_models
+
 def get_llm_model(provider: str, **kwargs):
     """
-    获取LLM 模型
-    :param provider: 模型类型
+    Get LLM model
+    :param provider: model type
     :param kwargs:
     :return:
     """
@@ -72,7 +101,7 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
@@ -92,11 +121,12 @@ def get_llm_model(provider: str, **kwargs):
                 api_key=api_key,
             )
         else:
-            return ChatOpenAI(
+            return EnhancedChatOpenAI(
                 model=kwargs.get("model_name", "deepseek-chat"),
                 temperature=kwargs.get("temperature", 0.0),
                 base_url=base_url,
                 api_key=api_key,
+                extract_reasoning=True,
             )
     elif provider == "google":
         return ChatGoogleGenerativeAI(
@@ -109,22 +139,18 @@ def get_llm_model(provider: str, **kwargs):
             base_url = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
         else:
             base_url = kwargs.get("base_url")
-
-        if "deepseek-r1" in kwargs.get("model_name", "qwen2.5:7b"):
-            return DeepSeekR1ChatOllama(
-                model=kwargs.get("model_name", "deepseek-r1:14b"),
-                temperature=kwargs.get("temperature", 0.0),
-                num_ctx=kwargs.get("num_ctx", 32000),
-                base_url=base_url,
-            )
-        else:
-            return ChatOllama(
-                model=kwargs.get("model_name", "qwen2.5:7b"),
-                temperature=kwargs.get("temperature", 0.0),
-                num_ctx=kwargs.get("num_ctx", 32000),
-                num_predict=kwargs.get("num_predict", 1024),
-                base_url=base_url,
-            )
+        
+        model_name = kwargs.get("model_name", "qwen2.5:7b")
+        
+        # Use the enhanced ChatOllama for all Ollama models
+        return EnhancedChatOllama(
+            model=model_name,
+            temperature=kwargs.get("temperature", 0.0),
+            num_ctx=min(kwargs.get("num_ctx", 16000), 32000),
+            num_predict=kwargs.get("num_predict", 1024),
+            base_url=base_url,
+            stop=["<|im_end|>", "</answer>"]
+        )
     elif provider == "azure_openai":
         if not kwargs.get("base_url", ""):
             base_url = os.getenv("AZURE_OPENAI_ENDPOINT", "")
@@ -144,15 +170,14 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "qwen-plus"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
             api_key=api_key,
         )
-
     elif provider == "moonshot":
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "moonshot-v1-32k-vision-preview"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=os.getenv("MOONSHOT_ENDPOINT"),
@@ -160,21 +185,24 @@ def get_llm_model(provider: str, **kwargs):
         )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
-
+    
 # Predefined model names for common providers
 model_names = {
     "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
     "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo", "o3-mini"],
     "deepseek": ["deepseek-chat", "deepseek-reasoner"],
     "google": ["gemini-2.0-flash", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-01-21", "gemini-2.0-pro-exp-02-05"],
-    "ollama": ["qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5-coder:14b", "qwen2.5-coder:32b", "llama2:7b", "deepseek-r1:14b", "deepseek-r1:32b"],
     "azure_openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
     "mistral": ["pixtral-large-latest", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"],
     "alibaba": ["qwen-plus", "qwen-max", "qwen-turbo", "qwen-long"],
     "moonshot": ["moonshot-v1-32k-vision-preview", "moonshot-v1-8k-vision-preview"],
+    # Ollama models will be populated dynamically
+    "ollama": []
 }
 
-# Callback to update the model name dropdown based on the selected provider
+# Update model_names with current Ollama models
+model_names = update_model_names()
+
 def update_model_dropdown(llm_provider, api_key=None, base_url=None):
     """
     Update the model name dropdown with predefined models for the selected provider.
@@ -185,11 +213,37 @@ def update_model_dropdown(llm_provider, api_key=None, base_url=None):
     if not base_url:
         base_url = os.getenv(f"{llm_provider.upper()}_BASE_URL", "")
 
-    # Use predefined models for the selected provider
+    if llm_provider == "ollama":
+        # Refresh Ollama models list when provider is selected
+        current_models = get_ollama_models()
+        if current_models:
+            return gr.Dropdown(
+                choices=current_models,
+                value=current_models[0] if current_models else "",
+                interactive=True
+            )
+        else:
+            return gr.Dropdown(
+                choices=[],
+                value="",
+                interactive=True,
+                allow_custom_value=True
+            )
+    
+    # Use predefined models for other providers
     if llm_provider in model_names:
-        return gr.Dropdown(choices=model_names[llm_provider], value=model_names[llm_provider][0], interactive=True)
+        return gr.Dropdown(
+            choices=model_names[llm_provider],
+            value=model_names[llm_provider][0],
+            interactive=True
+        )
     else:
-        return gr.Dropdown(choices=[], value="", interactive=True, allow_custom_value=True)
+        return gr.Dropdown(
+            choices=[],
+            value="",
+            interactive=True,
+            allow_custom_value=True
+        )
 
 def handle_api_key_error(provider: str, env_var: str):
     """
@@ -208,7 +262,6 @@ def encode_image(img_path):
         image_data = base64.b64encode(fin.read()).decode("utf-8")
     return image_data
 
-
 def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Dict[str, Optional[str]]:
     """Get the latest recording and trace files"""
     latest_files: Dict[str, Optional[str]] = {ext: None for ext in file_types}
@@ -219,16 +272,25 @@ def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Di
 
     for file_type in file_types:
         try:
-            matches = list(Path(directory).rglob(f"*{file_type}"))
-            if matches:
-                latest = max(matches, key=lambda p: p.stat().st_mtime)
+            # Use os.walk instead of Path.rglob
+            matching_files = []
+            for root, _, files in os.walk(directory):
+                for filename in files:
+                    if filename.endswith(file_type):
+                        full_path = os.path.join(root, filename)
+                        matching_files.append(full_path)
+            
+            if matching_files:
+                # Find latest file by modification time
+                latest = max(matching_files, key=lambda p: os.path.getmtime(p))
                 # Only return files that are complete (not being written)
-                if time.time() - latest.stat().st_mtime > 1.0:
-                    latest_files[file_type] = str(latest)
+                if time.time() - os.path.getmtime(latest) > 1.0:
+                    latest_files[file_type] = latest
         except Exception as e:
             print(f"Error getting latest {file_type} file: {e}")
             
     return latest_files
+
 async def capture_screenshot(browser_context):
     """Capture and encode a screenshot"""
     # Extract the Playwright browser instance
