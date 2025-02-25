@@ -14,7 +14,7 @@ def default_config():
         "tool_calling_method": "auto",
         "llm_provider": "openai",
         "llm_model_name": "gpt-4o",
-        "llm_num_ctx": 32000,
+        "llm_num_ctx": 16000,
         "llm_temperature": 1.0,
         "llm_base_url": "",
         "llm_api_key": "",

@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Dict, Optional, List
 import requests
-from ollama import ListResponse, list
+from ollama import ListResponse, list,Client
 
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI
@@ -12,8 +12,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 import gradio as gr
+from src.utils.llm import EnhancedChatOllama, EnhancedChatOpenAI, DeepSeekR1ChatOpenAI
 
-from .llm import DeepSeekR1ChatOpenAI, DeepSeekR1ChatOllama
 
 PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
@@ -101,7 +101,7 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "gpt-4o"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
@@ -121,11 +121,12 @@ def get_llm_model(provider: str, **kwargs):
                 api_key=api_key,
             )
         else:
-            return ChatOpenAI(
+            return EnhancedChatOpenAI(
                 model=kwargs.get("model_name", "deepseek-chat"),
                 temperature=kwargs.get("temperature", 0.0),
                 base_url=base_url,
                 api_key=api_key,
+                extract_reasoning=True,
             )
     elif provider == "google":
         return ChatGoogleGenerativeAI(
@@ -138,22 +139,18 @@ def get_llm_model(provider: str, **kwargs):
             base_url = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
         else:
             base_url = kwargs.get("base_url")
-
-        if "deepseek-r1" in kwargs.get("model_name", "qwen2.5:7b"):
-            return DeepSeekR1ChatOllama(
-                model=kwargs.get("model_name", "deepseek-r1:14b"),
-                temperature=kwargs.get("temperature", 0.0),
-                num_ctx=kwargs.get("num_ctx", 32000),
-                base_url=base_url,
-            )
-        else:
-            return ChatOllama(
-                model=kwargs.get("model_name", "qwen2.5:7b"),
-                temperature=kwargs.get("temperature", 0.0),
-                num_ctx=kwargs.get("num_ctx", 32000),
-                num_predict=kwargs.get("num_predict", 1024),
-                base_url=base_url,
-            )
+        
+        model_name = kwargs.get("model_name", "qwen2.5:7b")
+        
+        # Use the enhanced ChatOllama for all Ollama models
+        return EnhancedChatOllama(
+            model=model_name,
+            temperature=kwargs.get("temperature", 0.0),
+            num_ctx=min(kwargs.get("num_ctx", 16000), 32000),
+            num_predict=kwargs.get("num_predict", 1024),
+            base_url=base_url,
+            stop=["<|im_end|>", "</answer>"]
+        )
     elif provider == "azure_openai":
         if not kwargs.get("base_url", ""):
             base_url = os.getenv("AZURE_OPENAI_ENDPOINT", "")
@@ -173,14 +170,14 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "qwen-plus"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
             api_key=api_key,
         )
     elif provider == "moonshot":
-        return ChatOpenAI(
+        return EnhancedChatOpenAI(
             model=kwargs.get("model_name", "moonshot-v1-32k-vision-preview"),
             temperature=kwargs.get("temperature", 0.0),
             base_url=os.getenv("MOONSHOT_ENDPOINT"),
@@ -188,7 +185,7 @@ def get_llm_model(provider: str, **kwargs):
         )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
-
+    
 # Predefined model names for common providers
 model_names = {
     "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
@@ -275,12 +272,20 @@ def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Di
 
     for file_type in file_types:
         try:
-            matches = list(Path(directory).rglob(f"*{file_type}"))
-            if matches:
-                latest = max(matches, key=lambda p: p.stat().st_mtime)
+            # Use os.walk instead of Path.rglob
+            matching_files = []
+            for root, _, files in os.walk(directory):
+                for filename in files:
+                    if filename.endswith(file_type):
+                        full_path = os.path.join(root, filename)
+                        matching_files.append(full_path)
+            
+            if matching_files:
+                # Find latest file by modification time
+                latest = max(matching_files, key=lambda p: os.path.getmtime(p))
                 # Only return files that are complete (not being written)
-                if time.time() - latest.stat().st_mtime > 1.0:
-                    latest_files[file_type] = str(latest)
+                if time.time() - os.path.getmtime(latest) > 1.0:
+                    latest_files[file_type] = latest
         except Exception as e:
             print(f"Error getting latest {file_type} file: {e}")
             

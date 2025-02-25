@@ -220,6 +220,7 @@ class CustomAgent(Agent):
 
         logger.info(f"🧠 All Memory: \n{step_info.memory}")
 
+
     @time_execution_async("--get_next_action")
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
         """Get next action from LLM based on current state"""
@@ -232,20 +233,73 @@ class CustomAgent(Agent):
             logger.info(ai_message.reasoning_content)
             logger.info("🤯 End Deep Thinking")
 
-        if isinstance(ai_message.content, list):
-            ai_content = ai_message.content[0]
-        else:
-            ai_content = ai_message.content
+        try:
+            if isinstance(ai_message.content, list):
+                ai_content = ai_message.content[0]
+            else:
+                ai_content = ai_message.content
 
-        ai_content = ai_content.replace("```json", "").replace("```", "")
-        ai_content = repair_json(ai_content)
-        parsed_json = json.loads(ai_content)
-        parsed: AgentOutput = self.AgentOutput(**parsed_json)
-
-        if parsed is None:
-            logger.debug(ai_message.content)
-            raise ValueError('Could not parse response.')
+            # Add this debug print
+            print("RAW AI CONTENT:", ai_content)
+                
+            # Enhanced JSON parsing
+            if "```json" in ai_content or "```" in ai_content:
+                # Extract JSON from code blocks
+                ai_content = re.sub(r'```(?:json)?(.*?)```', r'\1', ai_content, flags=re.DOTALL)
+            
+            # Try to repair the JSON
+            try:
+                ai_content = repair_json(ai_content)
+            except Exception as json_repair_error:
+                logger.warning(f"JSON repair failed: {json_repair_error}")
+                # Try more aggressive cleaning
+                ai_content = re.sub(r'[^{}[\],:"\d\w\s.-]', '', ai_content)
+                                            
+            try:               
+                parsed_json = json.loads(ai_content)
+                if 'action' in parsed_json:
+                    for action in parsed_json['action']:
+                        if isinstance(action, dict) and 'done' in action and isinstance(action['done'], dict) and 'text' in action['done']:
+                            # If text is a dict with type/value structure, extract the value
+                            if isinstance(action['done']['text'], dict) and 'value' in action['done']['text']:
+                                action['done']['text'] = action['done']['text']['value']
+                            # If text is any other non-string dict, convert to string
+                            elif isinstance(action['done']['text'], dict):
+                                action['done']['text'] = str(action['done']['text'])
+                parsed: AgentOutput = self.AgentOutput(**parsed_json)
+            except json.JSONDecodeError as e:
+                # Create a minimal valid structure if parsing fails
+                logger.warning("JSON parsing failed, creating minimal structure")
+                parsed_json = {
+                    "current_state": {
+                        "prev_action_evaluation": "Failed - Unable to parse model output",
+                        "important_contents": "",
+                        "task_progress": "",
+                        "future_plans": "Retry with simpler action",
+                        "thought": "The model output was malformed. I need to retry with a simpler action.",
+                        "summary": "Retrying with simpler action"
+                    },
+                    "action": [{"extract_page_content": {}}]  # Safe fallback action
+                }
+                
+            parsed: AgentOutput = self.AgentOutput(**parsed_json)
+        except Exception as e:
+            logger.error(f"Error processing model output: {e}")
+            # Create a minimal fallback output
+            minimal_json = {
+                "current_state": {
+                    "prev_action_evaluation": "Failed - Unable to process model output",
+                    "important_contents": "",
+                    "task_progress": "",
+                    "future_plans": "Retry with simpler action",
+                    "thought": "There was an error processing the model output. I'll take a safe action.",
+                    "summary": "Handling error gracefully"
+                },
+                "action": [{"extract_page_content": {}}]  # Safe fallback action
+            }
+            parsed = self.AgentOutput(**minimal_json)
         
+        # Continue with existing code...
         if len(parsed.action) > 0:
             first_action = parsed.action[0]
             if hasattr(first_action, 'go_to_url'):
@@ -363,14 +417,17 @@ class CustomAgent(Agent):
                 check_break_if_paused=lambda: self._check_if_stopped_or_paused(),
                 available_file_paths=self.available_file_paths,
             )
-            if len(result) != len(actions):
-                # I think something changes, such information should let LLM know
+            if len(result) != len(actions) and len(actions) > 0:
+                # Add safety check for result list
+                base_action_index = len(result) - 1 if len(result) > 0 else 0
                 for ri in range(len(result), len(actions)):
+                    error_msg = f"{actions[ri].model_dump_json(exclude_unset=True)} is Failed to execute."
+                    if len(result) > 0:
+                        error_msg += f" Something new appeared after action {actions[base_action_index].model_dump_json(exclude_unset=True)}"
                     result.append(ActionResult(extracted_content=None,
-                                               include_in_memory=True,
-                                               error=f"{actions[ri].model_dump_json(exclude_unset=True)} is Failed to execute. \
-                                                    Something new appeared after action {actions[len(result) - 1].model_dump_json(exclude_unset=True)}",
-                                               is_done=False))
+                                            include_in_memory=True,
+                                            error=error_msg,
+                                            is_done=False))
             for ret_ in result:
                 if ret_.extracted_content and "Extracted page" in ret_.extracted_content:
                     # record every extracted page
