@@ -1,0 +1,47 @@
+Step-by-Step Instructions
+
+1. Navigate to Athenahealth Preview Environment
+   - Open a web browser and go to: https://preview.athenahealth.com/
+
+2. Log In
+   - Enter the credentials:
+     - Username: p-bkumar1
+     - Password: Xcaliber@12345
+   - Click the Login button.
+
+3. Select the Default Department
+   - If prompted, choose the default department from the list (e.g., "7 Hills Department").
+
+4. Access the "Patients" Menu
+   - Locate the header at the top of the dashboard.
+   - Click on the "Patients" menu to open the dropdown.
+
+5. Access Document Search
+   - Option 1 (Primary Attempt)
+     - In the dropdown, look for "Documents > Document Search" and click it.
+     - If the primary attempt fails (error 404 or element not found):
+       - Refresh the page.
+       - Retry clicking "Document Search" (up to 3 times with 2-second intervals).
+
+6. Handle Iframes (Fallback Approach)
+   - Use the following sequence if Document Search is nested in iframes:
+     - Switch to the main iframe context:
+       - Locate and switch to iframe[name="frMain"].
+     - Switch to the sub-iframe:
+       - Locate and switch to iframe[id="searchFrame"] or iframe[name="frMain"] > iframe (if nested).
+     - Fill the DOCUMENTID and click Search:
+       - Enter the value "116873" in the DOCUMENTID field.
+       - Click the "Search" button.
+       - Retry up to 3 times:
+         - Wait 2 seconds between each retry if elements are missing.
+
+7. Observe and Report
+   - After clicking "Document Search" or executing the iframe fallback:
+     
+Common Issues and Solutions
+- Element Not Found: Ensure the iframe is fully loaded (wait for 5–10 seconds).
+- Button Not Clickable: try to force click button again.
+- Network Errors: Verify your internet connection and retry the login process.
+
+Result
+- After following the steps, patient lab reports will be displayed. The task is completed successfully.

@@ -10,7 +10,7 @@ def default_config():
         "agent_type": "custom",
         "max_steps": 100,
         "max_actions_per_step": 10,
-        "use_vision": True,
+        "use_vision": False,
         "tool_calling_method": "auto",
         "llm_provider": "openai",
         "llm_model_name": "gpt-4o",

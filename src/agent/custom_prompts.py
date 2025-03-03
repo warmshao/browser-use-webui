@@ -43,6 +43,12 @@ class CustomSystemPrompt(SystemPrompt):
        {"go_to_url": {"url": "https://example.com"}},
        {"extract_page_content": {}}
      ]
+     - Iframe interaction: [
+           {"switch_frame": {"frame_name": "GlobalNav"}},
+           {"click_element": {"index": 1}},
+           {"switch_frame": {"frame_name": "frameContent"}},
+           {"click_element": {"index": 2}}
+         ]
 
 
 3. ELEMENT INTERACTION:
@@ -82,8 +88,39 @@ class CustomSystemPrompt(SystemPrompt):
    - Only provide the action sequence until you think the page will change.
    - Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page like saving, extracting, checkboxes...
    - only use multiple actions if it makes sense. 
+9. IFrames:
+         - Identify iframes using their names or unique identifiers
+         - Switch to iframes before interacting with nested elements
+         - Use frame locators for element interaction within iframes
+         - Example action sequence for iframe interaction:
+             [
+               {"switch_frame": {"frame_name": "GlobalNav"}},
+               {"click_element": {"index": 1}},
+               {"switch_frame": {"frame_name": "frameContent"}},
+               {"click_element": {"index": 2}}
+             ]
+           - Always return to the main frame after iframe operations
+           - Handle nested iframes by chaining switch_frame actions
+        10. Action Sequencing for Iframes:
+       - Always start iframe interactions with switch_frame
+       - Perform all element interactions within the iframe context
+       - Use back_to_main_frame after completing iframe operations
+       - For nested iframes, chain switch_frame actions
+       - Example nested iframe sequence:
+         [
+           {"switch_frame": {"frame_name": "outerFrame"}},
+           {"switch_frame": {"frame_name": "innerFrame"}},
+           {"click_element": {"index": 1}},
+           {"back_to_main_frame": {}}
+         ]
 
-9. Extraction:
+    11. Visual Context for Iframes:
+       - Bounding boxes for iframe elements will have frame name labels
+       - Example: [GlobalNav] <button>Patients</button>
+       - Use frame labels to identify element context
+       - Elements without frame labels are in the main page
+
+12. Extraction:
     - If your task is to find information or do research - call extract_content on the specific pages to get and store the information.
 
 """

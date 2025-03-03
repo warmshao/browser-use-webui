@@ -53,15 +53,15 @@ class CustomAgent(Agent):
             browser: Browser | None = None,
             browser_context: BrowserContext | None = None,
             controller: Controller = Controller(),
-            use_vision: bool = True,
+            use_vision: bool = False,
             use_vision_for_planner: bool = False,
             save_conversation_path: Optional[str] = None,
             save_conversation_path_encoding: Optional[str] = 'utf-8',
-            max_failures: int = 3,
+            max_failures: int = 5,
             retry_delay: int = 10,
             system_prompt_class: Type[SystemPrompt] = SystemPrompt,
             agent_prompt_class: Type[AgentMessagePrompt] = AgentMessagePrompt,
-            max_input_tokens: int = 128000,
+            max_input_tokens: int = 1280000,
             validate_output: bool = False,
             message_context: Optional[str] = None,
             generate_gif: bool | str = True,
@@ -281,8 +281,8 @@ class CustomAgent(Agent):
             planner_messages[-1] = HumanMessage(content=new_msg)
 
         # Get planner output
-        response = await self.planner_llm.ainvoke(planner_messages)
-        plan = response.content
+        response = await self.ainvoke(planner_messages)
+        plan = response.contentplanner_llm
         last_state_message = planner_messages[-1]
         # remove image from last state message
         if isinstance(last_state_message.content, list):
