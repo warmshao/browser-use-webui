@@ -1,0 +1,6 @@
+actions:
+  - name: search-linkedin
+    script: search_script.py
+    params: query
+    command: pytest ./tmp/myscript/search_script.py --query query
+    slowmo: 5000  # スローモーションで1秒（1000ms）の遅延
